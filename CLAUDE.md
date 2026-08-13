@@ -108,6 +108,40 @@ Columna "Origen": **enunciado** = impuesto por la cátedra, no se negocia. **gru
 - Un archivo = una responsabilidad. Controladores finos, lógica en services.
 - Async/await con try/catch; los errores suben al middleware manejador de errores.
 
+### 4.1 📖 Documentación obligatoria (INNEGOCIABLE)
+
+**Todo el código que escribas tiene que estar documentado.** El objetivo no es decorar: este es un TP de aprendizaje y el autor tiene que poder leer cualquier archivo y entender qué hace y por qué, sin tener que reconstruirlo mentalmente. También hay una defensa oral: si no se puede explicar, no sirve.
+
+Reglas concretas:
+
+1. **Cada archivo arranca con un bloque de cabecera** que diga qué responsabilidad tiene y en qué parte del flujo entra (ruta → controller → service → base).
+2. **Cada función, clase o constante exportada lleva un bloque JSDoc** (`/** ... */`) con:
+   - qué hace, en una frase;
+   - `@param` de cada parámetro que no sea evidente;
+   - `@returns` de lo que devuelve;
+   - `@throws` si puede lanzar un `ErrorHttp` (con qué código y en qué caso).
+   Usar JSDoc y no `//` sueltos, porque el editor lo muestra como tooltip al pasar el mouse.
+3. **Las decisiones no obvias se explican con un comentario `//` que responda "por qué", no "qué".** El código ya dice qué hace; lo que se pierde con el tiempo es el motivo. Casos típicos acá: por qué `telefono` es obligatorio, por qué el mensaje de login es genérico, por qué la unicidad se valida en la app y no en la base.
+4. **Las queries SQL llevan un comentario** si hacen algo más que un SELECT directo, o si la elección de columnas tiene una razón (por ejemplo, listar columnas explícitas para que nunca salga la `password`).
+5. **No documentar lo obvio.** `// suma uno al contador` sobre `contador++` es ruido. Si el comentario solo repite el nombre de la función, sobra.
+6. **Comentarios en español**, igual que el resto del código.
+7. **Si cambiás código, actualizá su comentario en el mismo momento.** Un comentario que miente es peor que no tener comentario.
+
+Ejemplo del nivel esperado:
+
+```ts
+/**
+ * Busca un usuario por DNI incluyendo el hash de la contraseña.
+ *
+ * Devuelve la fila completa (con `password`) porque el login necesita el hash
+ * para compararlo con bcrypt. Para cualquier otro uso va `buscarPublicoPorId`,
+ * que no expone ese campo.
+ *
+ * @param dni DNI tal como lo mandó el cliente, ya validado.
+ * @returns El usuario, o `null` si no existe ninguno con ese DNI.
+ */
+```
+
 ---
 
 ## 5. Estructura de carpetas
