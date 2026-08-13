@@ -1,0 +1,428 @@
+{
+  "info": {
+    "name": "Clínica — Backend Semana 1",
+    "description": "TP Integrador Programación 2 — Setup, conexión a la base y autenticación.\n\nOrden sugerido de ejecución: Salud → Coberturas → Registro → Login → Perfil → Sedes.\n\nEl request de Login guarda el JWT en la variable de colección `token`, así que los endpoints protegidos funcionan sin copiar y pegar nada a mano.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "dni_prueba", "value": "40123456", "type": "string" },
+    { "key": "password_prueba", "value": "secreto123", "type": "string" },
+    { "key": "dni_admin", "value": "18222333", "type": "string" },
+    { "key": "password_admin", "value": "admin123", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Salud",
+      "item": [
+        {
+          "name": "GET /health — servidor y base OK (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
+            "description": "Verifica que el servidor responda y que la conexión a la base funcione. Si la base está caída responde 503."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo');",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('estado ok', () => pm.expect(r.estado).to.eql('ok'));",
+                  "pm.test('Base de datos conectada', () => pm.expect(r.datos.base_de_datos).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Coberturas",
+      "item": [
+        {
+          "name": "GET /coberturas — listado público (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/coberturas", "host": ["{{baseUrl}}"], "path": ["coberturas"] },
+            "description": "Servicio que recupera las coberturas disponibles para elegir en el registro."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('estado ok', () => pm.expect(r.estado).to.eql('ok'));",
+                  "pm.test('datos es un array', () => pm.expect(r.datos).to.be.an('array'));",
+                  "pm.test('Cada cobertura trae id y nombre', () => {",
+                  "    if (r.datos.length > 0) {",
+                  "        pm.expect(r.datos[0]).to.have.property('id');",
+                  "        pm.expect(r.datos[0]).to.have.property('nombre');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Registro",
+      "item": [
+        {
+          "name": "POST /auth/registro — alta de paciente (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Paciente\",\n  \"apellido\": \"DePrueba\",\n  \"dni\": \"{{dni_prueba}}\",\n  \"email\": \"paciente.prueba@test.com\",\n  \"password\": \"{{password_prueba}}\",\n  \"telefono\": \"3424111000\",\n  \"fecha_nacimiento\": \"1999-05-20\",\n  \"id_cobertura\": 1\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/registro", "host": ["{{baseUrl}}"], "path": ["auth", "registro"] },
+            "description": "Alta de paciente. El rol se asigna automáticamente como `paciente` e `id_sede` queda en null.\n\nNOTA: `telefono` no figura en la consigna, pero la columna es NOT NULL sin default en el script provisto, así que es obligatorio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('estado ok', () => pm.expect(r.estado).to.eql('ok'));",
+                  "pm.test('Rol asignado automáticamente: paciente', () => pm.expect(r.datos.rol).to.eql('paciente'));",
+                  "pm.test('id_sede es null para pacientes', () => pm.expect(r.datos.id_sede).to.eql(null));",
+                  "pm.test('NUNCA devuelve la password', () => pm.expect(r.datos).to.not.have.property('password'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/registro — DNI duplicado (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Otro\",\n  \"apellido\": \"Paciente\",\n  \"dni\": \"{{dni_prueba}}\",\n  \"email\": \"otro.mail@test.com\",\n  \"password\": \"secreto123\",\n  \"telefono\": \"3424111001\",\n  \"fecha_nacimiento\": \"1990-01-15\",\n  \"id_cobertura\": 1\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/registro", "host": ["{{baseUrl}}"], "path": ["auth", "registro"] },
+            "description": "Ejecutar DESPUÉS del alta exitosa. La base no tiene UNIQUE en dni: la unicidad se valida en la aplicación."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "const r = pm.response.json();",
+                  "pm.test('El error se explica en estado', () => pm.expect(r.estado).to.include('DNI'));",
+                  "pm.test('datos viene en null', () => pm.expect(r.datos).to.eql(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/registro — datos inválidos (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"\",\n  \"apellido\": \"Sinnombre\",\n  \"dni\": \"abc\",\n  \"email\": \"no-es-un-email\",\n  \"password\": \"123\",\n  \"telefono\": \"3424111002\",\n  \"fecha_nacimiento\": \"20-05-1999\",\n  \"id_cobertura\": 1\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/registro", "host": ["{{baseUrl}}"], "path": ["auth", "registro"] },
+            "description": "Todos los errores de validación vuelven juntos en un único 400."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme también en el error', () => {",
+                  "    pm.expect(r.codigo).to.eql(400);",
+                  "    pm.expect(r.datos).to.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Login",
+      "item": [
+        {
+          "name": "POST /auth/login — credenciales correctas (200)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dni_prueba}}\",\n  \"password\": \"{{password_prueba}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Guarda automáticamente el JWT en la variable de colección `token`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Devuelve token', () => pm.expect(r.datos.token).to.be.a('string').and.not.empty);",
+                  "",
+                  "// El JWT debe traer id, rol e id_sede",
+                  "const payload = JSON.parse(atob(r.datos.token.split('.')[1]));",
+                  "pm.test('El payload trae id, rol e id_sede', () => {",
+                  "    pm.expect(payload).to.have.property('id');",
+                  "    pm.expect(payload).to.have.property('rol');",
+                  "    pm.expect(payload).to.have.property('id_sede');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('token', r.datos.token);",
+                  "console.log('Token guardado en la variable {{token}}');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — password incorrecta (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dni_prueba}}\",\n  \"password\": \"password_equivocada\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "El mensaje es genérico a propósito: no revela si falló el dni o la contraseña."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "const r = pm.response.json();",
+                  "pm.test('Mensaje genérico (no revela cuál de los dos falló)', () => {",
+                  "    pm.expect(r.estado.toLowerCase()).to.not.include('no existe');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — DNI inexistente (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"99999999\",\n  \"password\": \"loquesea123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Perfil (prueba de verificarToken)",
+      "item": [
+        {
+          "name": "GET /auth/perfil — con token válido (200)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/auth/perfil", "host": ["{{baseUrl}}"], "path": ["auth", "perfil"] },
+            "description": "Devuelve los datos del usuario logueado tomando el id del token. Requiere haber ejecutado el login antes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('estado ok', () => pm.expect(r.estado).to.eql('ok'));",
+                  "pm.test('NUNCA devuelve la password', () => pm.expect(r.datos).to.not.have.property('password'));",
+                  "pm.test('Trae los datos del usuario', () => {",
+                  "    pm.expect(r.datos).to.have.property('nombre');",
+                  "    pm.expect(r.datos).to.have.property('dni');",
+                  "    pm.expect(r.datos).to.have.property('rol');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/perfil — sin token (401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/perfil", "host": ["{{baseUrl}}"], "path": ["auth", "perfil"] },
+            "description": "Criterio de aceptación: un endpoint protegido rechaza con 401 si no hay token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme también en el 401', () => {",
+                  "    pm.expect(r.codigo).to.eql(401);",
+                  "    pm.expect(r.datos).to.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/perfil — token inválido (401)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer token.claramente.invalido" }],
+            "url": { "raw": "{{baseUrl}}/auth/perfil", "host": ["{{baseUrl}}"], "path": ["auth", "perfil"] },
+            "description": "Criterio de aceptación: un endpoint protegido rechaza con 401 si el token es inválido."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Sedes (prueba de verificarRol)",
+      "item": [
+        {
+          "name": "GET /sedes — rol no permitido (403)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/sedes", "host": ["{{baseUrl}}"], "path": ["sedes"] },
+            "description": "Con el token del paciente registrado. Criterio de aceptación: rechaza con 403 a un rol no permitido."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme también en el 403', () => {",
+                  "    pm.expect(r.codigo).to.eql(403);",
+                  "    pm.expect(r.datos).to.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login como admin (requiere hash real en la base)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dni_admin}}\",\n  \"password\": \"{{password_admin}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Los usuarios del seed tienen hashes FALSOS, así que este login da 401 hasta que se cargue un hash bcrypt real para el admin. Ver README, sección 'Usuario admin de prueba'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const r = pm.response.json();",
+                  "    pm.collectionVariables.set('token', r.datos.token);",
+                  "    pm.test('Login de admin OK', () => pm.expect(r.datos.usuario.rol).to.eql('admin'));",
+                  "} else {",
+                  "    console.log('El admin del seed todavía no tiene un hash bcrypt real. Ver README.');",
+                  "    pm.test('401 esperado mientras el admin tenga el hash falso del seed', () => pm.response.to.have.status(401));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /sedes — como admin (200)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/sedes", "host": ["{{baseUrl}}"], "path": ["sedes"] },
+            "description": "Ejecutar después del login como admin. Devuelve el listado de sedes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('datos es un array de sedes', () => pm.expect(r.datos).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
