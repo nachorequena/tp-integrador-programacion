@@ -197,6 +197,24 @@ En [postman/](postman/) está `Clinica-Backend-Semana1.postman_collection.json`.
 - La variable `baseUrl` apunta a `http://localhost:3000`.
 - Incluye los casos negativos que pide el enunciado: 400 de validación, 409 de duplicados, 401 sin token / token inválido y 403 por rol.
 
+### Corrida completa: 14 requests, 36 asserts, todo en verde
+
+Con **Run collection** se ejecutan los 14 requests de una. El resultado esperado es **36/36 asserts en verde**.
+
+⚠️ Para que dé todo verde, el paciente de prueba **no tiene que existir** todavía: el primer request lo da de alta y espera un **201**. Si ya se corrió antes, ese request devuelve 409 (el DNI ya está registrado) y falla 1 assert. Antes de cada corrida completa:
+
+```sql
+DELETE FROM usuario WHERE dni = '40123456';
+```
+
+No hace falta si se ejecutan los requests de a uno: los demás funcionan con el paciente ya creado.
+
+También se puede correr desde la terminal, sin instalar nada en el proyecto:
+
+```bash
+npx newman run postman/Clinica-Backend-Semana1.postman_collection.json
+```
+
 ---
 
 ## Estructura del proyecto

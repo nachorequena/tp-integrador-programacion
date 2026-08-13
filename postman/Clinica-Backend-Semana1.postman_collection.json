@@ -103,10 +103,17 @@
                 "exec": [
                   "pm.test('Responde 201', () => pm.response.to.have.status(201));",
                   "const r = pm.response.json();",
-                  "pm.test('estado ok', () => pm.expect(r.estado).to.eql('ok'));",
-                  "pm.test('Rol asignado automáticamente: paciente', () => pm.expect(r.datos.rol).to.eql('paciente'));",
-                  "pm.test('id_sede es null para pacientes', () => pm.expect(r.datos.id_sede).to.eql(null));",
-                  "pm.test('NUNCA devuelve la password', () => pm.expect(r.datos).to.not.have.property('password'));"
+                  "",
+                  "if (pm.response.code === 409) {",
+                  "    // El paciente de prueba ya existe de una corrida anterior.",
+                  "    console.warn('El DNI de prueba ya está registrado. Para una corrida limpia ejecutá en la base:');",
+                  "    console.warn(\"DELETE FROM usuario WHERE dni = '\" + pm.collectionVariables.get('dni_prueba') + \"';\");",
+                  "} else {",
+                  "    pm.test('estado ok', () => pm.expect(r.estado).to.eql('ok'));",
+                  "    pm.test('Rol asignado automáticamente: paciente', () => pm.expect(r.datos.rol).to.eql('paciente'));",
+                  "    pm.test('id_sede es null para pacientes', () => pm.expect(r.datos.id_sede).to.eql(null));",
+                  "    pm.test('NUNCA devuelve la password', () => pm.expect(r.datos).to.not.have.property('password'));",
+                  "}"
                 ]
               }
             }
@@ -195,8 +202,12 @@
                   "const r = pm.response.json();",
                   "pm.test('Devuelve token', () => pm.expect(r.datos.token).to.be.a('string').and.not.empty);",
                   "",
-                  "// El JWT debe traer id, rol e id_sede",
-                  "const payload = JSON.parse(atob(r.datos.token.split('.')[1]));",
+                  "// El JWT debe traer id, rol e id_sede.",
+                  "// El payload viene en base64url: hay que pasarlo a base64 estándar",
+                  "// y completar el padding antes de decodificarlo.",
+                  "let b64 = r.datos.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+                  "while (b64.length % 4 !== 0) { b64 += '='; }",
+                  "const payload = JSON.parse(atob(b64));",
                   "pm.test('El payload trae id, rol e id_sede', () => {",
                   "    pm.expect(payload).to.have.property('id');",
                   "    pm.expect(payload).to.have.property('rol');",
