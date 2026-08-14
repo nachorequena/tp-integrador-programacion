@@ -12,21 +12,28 @@
  *   └───────────────────────────────────────────────────────────┘
  *                          POST /auth/login
  *
- * Por eso adentro de los routers las rutas se escriben "/" o "/login" y no la
- * URL completa: el prefijo ya lo puso este archivo. La ventaja es que cambiar
- * `/coberturas` por `/obras-sociales` se hace tocando una sola línea.
+ * Por eso adentro de los routers las rutas se escriben "/" o "/:id" y no la URL
+ * completa: el prefijo ya lo puso este archivo. La ventaja es que cambiar
+ * `/agendas` por `/agenda` se hace tocando una sola línea.
  */
 
 import { Router } from "express";
+import { rutasAgenda } from "./agenda.routes";
 import { rutasAuth } from "./auth.routes";
 import { rutasCobertura } from "./cobertura.routes";
+import { rutasEspecialidad } from "./especialidad.routes";
 import { rutasHealth } from "./health.routes";
 import { rutasSede } from "./sede.routes";
 
 /** Router raíz. Lo monta `app.use(rutas)` en src/index.ts. */
 export const rutas = Router();
 
-rutas.use("/health", rutasHealth); //      GET  /health
-rutas.use("/coberturas", rutasCobertura); // GET  /coberturas
-rutas.use("/auth", rutasAuth); //          POST /auth/registro, /auth/login · GET /auth/perfil
-rutas.use("/sedes", rutasSede); //         GET  /sedes
+// Semana 1 — autenticación
+rutas.use("/health", rutasHealth); //           público
+rutas.use("/auth", rutasAuth); //               registro y login públicos, perfil con token
+
+// Semana 2 — CRUD de las entidades base y de la agenda
+rutas.use("/coberturas", rutasCobertura); //    /disponibles público, el resto admin
+rutas.use("/sedes", rutasSede); //              admin
+rutas.use("/especialidades", rutasEspecialidad); // admin
+rutas.use("/agendas", rutasAgenda); //          medico (la propia), operador y admin
