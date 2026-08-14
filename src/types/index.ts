@@ -76,6 +76,42 @@ export interface Sede {
   telefono: string;
 }
 
+/** Fila de la tabla `especialidad`. Ojo: el campo es `descripcion`, no `nombre`. */
+export interface Especialidad {
+  id: number;
+  descripcion: string;
+}
+
+/**
+ * Fila de la tabla `agenda`: un rango horario que un médico atiende en una
+ * sede, para una especialidad y una fecha concretas.
+ *
+ * Las horas son `varchar(5)` en la base ("15:00"), no un tipo `time`.
+ */
+export interface Agenda {
+  id: number;
+  hora_entrada: string;
+  hora_salida: string;
+  /** Formato "YYYY-MM-DD". */
+  fecha: string;
+  id_medico: number;
+  id_especialidad: number;
+  id_sede: number;
+}
+
+/**
+ * Fila de agenda con los nombres resueltos por JOIN.
+ *
+ * Es lo que devuelve el listado: con los ids sueltos, quien consume la API
+ * necesitaría una llamada extra por cada uno para saber de qué médico, sede o
+ * especialidad se trata.
+ */
+export interface AgendaDetallada extends Agenda {
+  medico: string;
+  especialidad: string;
+  sede: string;
+}
+
 /**
  * Contenido del JWT que se firma en el login.
  *
@@ -113,4 +149,41 @@ export interface DatosRegistro {
 export interface DatosLogin {
   dni: string;
   password: string;
+}
+
+/** Cuerpo ya validado del alta/modificación de una sede. */
+export interface DatosSede {
+  nombre: string;
+  direccion: string;
+  telefono: string;
+}
+
+/** Cuerpo ya validado del alta/modificación de una especialidad. */
+export interface DatosEspecialidad {
+  descripcion: string;
+}
+
+/** Cuerpo ya validado del alta/modificación de una cobertura. */
+export interface DatosCobertura {
+  nombre: string;
+}
+
+/** Cuerpo ya validado del alta/modificación de una agenda. */
+export interface DatosAgenda {
+  hora_entrada: string;
+  hora_salida: string;
+  fecha: string;
+  id_medico: number;
+  id_especialidad: number;
+  id_sede: number;
+}
+
+/**
+ * Filtros del listado de agenda, ya validados. Los tres son opcionales y se
+ * combinan entre sí (`GET /agendas?id_sede=1&fecha=2025-10-20`).
+ */
+export interface FiltrosAgenda {
+  id_medico?: number;
+  id_sede?: number;
+  fecha?: string;
 }

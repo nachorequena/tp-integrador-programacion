@@ -16,67 +16,22 @@
  * POR QUÉ IMPORTAN LOS LARGOS: los límites replican los de
  * `docs/clinica_ampliada.sql`. Si se dejan pasar, MySQL rechaza el INSERT (y se
  * ve un 500 feo) o, peor, trunca el dato en silencio y queda mal guardado.
- * Validar acá convierte eso en un 400 con un mensaje entendible.
  *
- * CRITERIO DE ERRORES: se juntan TODOS los problemas y se devuelven en un solo
- * 400, en vez de cortar en el primero. Así quien consume la API los corrige de
- * una vez y no descubre uno nuevo en cada intento.
+ * Los helpers genéricos (recorte de texto, validación de fecha, cierre con
+ * error 400) viven en `comunes.ts` y los comparten todos los validadores.
  */
 
 import { DatosLogin, DatosRegistro } from "../types";
-import { ErrorHttp } from "../utils/errorHttp";
+import {
+  comoObjeto,
+  esFechaValida,
+  lanzarSiHayErrores,
+  SOLO_DIGITOS,
+  textoLimpio,
+} from "./comunes";
 
 /** Formato mínimo de email: algo + @ + algo + punto + algo, sin espacios. */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** Solo dígitos del 0 al 9, al menos uno. Para DNI y teléfono. */
-const SOLO_DIGITOS = /^\d+$/;
-
-/** Formato de fecha que espera una columna `date` de MySQL: YYYY-MM-DD. */
-const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * Verifica que un texto sea una fecha REAL con formato YYYY-MM-DD.
- *
- * El regex solo controla la forma: "2024-02-31" lo pasaría sin problema aunque
- * febrero no tenga 31 días. Por eso además se construye la fecha y se comprueba
- * que los tres componentes hayan sobrevivido: JavaScript "acomoda" los valores
- * inválidos (el 31 de febrero se convierte en el 2 o 3 de marzo), así que si lo
- * que sale no coincide con lo que entró, la fecha no existía.
- *
- * Se usa `Date.UTC` y no `new Date(a, m, d)` para que el resultado no dependa de
- * la zona horaria de la máquina donde corre el servidor.
- *
- * @param valor Texto a validar.
- * @returns `true` si es una fecha existente y bien formateada.
- */
-function esFechaValida(valor: string): boolean {
-  if (!FECHA_ISO.test(valor)) return false;
-
-  const [anio, mes, dia] = valor.split("-").map(Number);
-  // Los meses en JavaScript van de 0 (enero) a 11 (diciembre): de ahí el -1.
-  const fecha = new Date(Date.UTC(anio, mes - 1, dia));
-
-  return (
-    fecha.getUTCFullYear() === anio &&
-    fecha.getUTCMonth() === mes - 1 &&
-    fecha.getUTCDate() === dia
-  );
-}
-
-/**
- * Normaliza un valor de entrada a texto sin espacios sobrantes.
- *
- * Devuelve cadena vacía si no es un string: así un `null`, un número o un
- * objeto se tratan igual que un campo faltante, y alcanza con comprobar `if
- * (!valor)` en cada validación.
- *
- * @param valor Valor crudo del body, de tipo desconocido.
- * @returns El texto recortado, o "" si no era un string.
- */
-function textoLimpio(valor: unknown): string {
-  return typeof valor === "string" ? valor.trim() : "";
-}
 
 /**
  * Valida y normaliza el cuerpo de `POST /auth/registro`.
@@ -87,14 +42,7 @@ function textoLimpio(valor: unknown): string {
  * @throws `ErrorHttp` 400 con todos los errores encontrados, separados por "; ".
  */
 export function validarRegistro(cuerpo: unknown): DatosRegistro {
-  // Cubre los casos de body ausente, o de un JSON que es un número o un array.
-  if (typeof cuerpo !== "object" || cuerpo === null) {
-    throw new ErrorHttp(400, "El cuerpo de la petición debe ser un objeto JSON");
-  }
-
-  // `Record<string, unknown>` = objeto con claves de texto y valores por
-  // conocer. Permite leer propiedades sin que TypeScript asuma que existen.
-  const datos = cuerpo as Record<string, unknown>;
+  const datos = comoObjeto(cuerpo);
   const errores: string[] = [];
 
   const nombre = textoLimpio(datos.nombre);
@@ -165,9 +113,7 @@ export function validarRegistro(cuerpo: unknown): DatosRegistro {
   else if (!Number.isInteger(idCobertura) || idCobertura <= 0)
     errores.push("id_cobertura debe ser un número entero positivo");
 
-  if (errores.length > 0) {
-    throw new ErrorHttp(400, errores.join("; "));
-  }
+  lanzarSiHayErrores(errores);
 
   return {
     nombre,
@@ -194,11 +140,7 @@ export function validarRegistro(cuerpo: unknown): DatosRegistro {
  * @throws `ErrorHttp` 400 si falta alguno de los dos campos.
  */
 export function validarLogin(cuerpo: unknown): DatosLogin {
-  if (typeof cuerpo !== "object" || cuerpo === null) {
-    throw new ErrorHttp(400, "El cuerpo de la petición debe ser un objeto JSON");
-  }
-
-  const datos = cuerpo as Record<string, unknown>;
+  const datos = comoObjeto(cuerpo);
   const errores: string[] = [];
 
   const dni = textoLimpio(datos.dni);
@@ -207,9 +149,7 @@ export function validarLogin(cuerpo: unknown): DatosLogin {
   const password = typeof datos.password === "string" ? datos.password : "";
   if (!password) errores.push("password es obligatoria");
 
-  if (errores.length > 0) {
-    throw new ErrorHttp(400, errores.join("; "));
-  }
+  lanzarSiHayErrores(errores);
 
   return { dni, password };
 }
