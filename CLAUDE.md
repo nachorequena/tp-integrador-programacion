@@ -157,14 +157,19 @@ src/
 │   └── conexion.ts        # pool de conexión mysql2
 ├── controllers/           # reciben req/res, delegan en services
 │   ├── auth.controller.ts
+│   ├── agenda.controller.ts
 │   ├── cobertura.controller.ts
+│   ├── especialidad.controller.ts
 │   ├── sede.controller.ts
 │   └── health.controller.ts
 ├── services/              # lógica de negocio + acceso a datos (SQL)
 │   ├── auth.service.ts
 │   ├── usuario.service.ts
+│   ├── agenda.service.ts
 │   ├── cobertura.service.ts
-│   └── sede.service.ts
+│   ├── especialidad.service.ts
+│   ├── sede.service.ts
+│   └── dependencias.service.ts  # chequeo de FKs antes de un DELETE
 ├── middlewares/
 │   ├── verificarToken.ts
 │   ├── verificarRol.ts
@@ -172,17 +177,27 @@ src/
 ├── routes/
 │   ├── index.ts           # monta todas las rutas
 │   ├── auth.routes.ts
+│   ├── agenda.routes.ts
 │   ├── cobertura.routes.ts
+│   ├── especialidad.routes.ts
 │   ├── sede.routes.ts
 │   └── health.routes.ts
 ├── utils/
 │   ├── respuesta.ts       # helper de respuesta uniforme
+│   ├── errorHttp.ts       # error de negocio con código HTTP
 │   └── jwt.ts             # firmar/verificar tokens
 ├── validators/
-│   └── auth.validators.ts # validaciones de registro/login
+│   ├── comunes.ts         # helpers compartidos (texto, fecha, hora, ids)
+│   ├── auth.validators.ts
+│   ├── agenda.validators.ts
+│   └── entidades.validators.ts  # sede, especialidad y cobertura
 ├── types/
-│   └── index.ts
+│   ├── index.ts
+│   └── express.d.ts       # agrega req.usuario al Request de Express
 └── index.ts               # arranque de Express
+
+scripts/
+└── usuarios-prueba.sql    # contraseñas reales + 2do médico (ver sección 9)
 ```
 
 > La consigna pide textualmente `src/controllers`, `src/routes` y `src/database` ("o similar"). Se usan los tres con el nombre literal: cuesta cero y elimina cualquier objeción en la corrección.
@@ -484,8 +499,32 @@ En cualquier caso: dejar documentadas las credenciales de prueba en el README (e
 ## 14. Bitácora de progreso (actualizar al final de cada sesión)
 
 > Mantené esta sección al día para conservar contexto entre sesiones de Claude Code.
+> Semanas más recientes arriba.
 
-- **Semana en curso:** Semana 1 — Setup, conexión y autenticación.
+**Semana en curso:** Semana 2 ✅ entregada. **Pendiente:** esperar la consigna de la semana 3.
+
+### Semana 2 — CRUD de sedes, especialidades, coberturas y agenda
+
+- **Estado:** ✅ Completa y verificada end-to-end. **86/86 asserts** en verde (52 requests), más **36/36** de la semana 1 sin regresiones.
+- **Rama:** `entrega-backend-2`, como exige la consigna.
+- **Hecho:**
+  - 16 endpoints nuevos: CRUD completo de sedes, especialidades, coberturas y agenda.
+  - Validación de dependencias antes de cada `DELETE`, cubriendo **todas** las FKs reales (409, nunca 500).
+  - Reglas de rol de la agenda: el médico solo la propia (validación por fila en el service), operador y admin cualquiera, paciente 403.
+  - Control de solapamiento de rangos horarios por médico y fecha.
+  - `scripts/usuarios-prueba.sql` versionado e idempotente (verificado corriéndolo dos veces).
+  - Colección de Postman de la semana 2, idempotente (verificado con dos corridas seguidas sin limpiar).
+- **Notas / decisiones tomadas:**
+  - **`administrador` del PDF = `admin` en la base.** La consigna escribe "administrador" pero el seed carga `admin`; manda la base. Documentado por si el docente objeta.
+  - **`GET /coberturas` dejó de ser público.** El criterio de aceptación exige 403 para todo rol que no sea admin, pero la consigna también pide un listado de solo lectura para el registro (que es público). No entran en la misma ruta: el público pasó a `GET /coberturas/disponibles` y se actualizó la colección de la semana 1.
+  - **El `admin` puede gestionar agenda igual que el `operador`.** La consigna no lo menciona; se decidió así porque sería incoherente que administre sedes y especialidades pero no pueda ver una agenda.
+  - **Se rechazan los rangos solapados** (409). La consigna solo pide permitir varios por día; los contiguos (08:00-12:00 y 12:00-16:00) sí se aceptan.
+  - **Segundo médico (Carlos Ruiz, dni 25333444)** agregado por el script de pruebas. El seed trae uno solo y con un único médico es imposible demostrar el criterio "el médico solo modifica su propia agenda".
+  - La consigna lista **menos dependencias de las que existen**: faltan `agenda.id_especialidad`, `turno.id_cobertura` y `turno.id_agenda`. Se validan igual, porque si no el `DELETE` termina en un 500.
+  - De `turno` (semana 3+) solo se hace `SELECT COUNT(*)` para las dependencias. Nada más.
+
+### Semana 1 — Setup, conexión y autenticación
+
 - **Estado:** ✅ Completa y verificada end-to-end (46/46 pruebas manuales contra la base real).
 - **Hecho:**
   - Proyecto inicializado: Express 5 + TypeScript 7, scripts `dev`/`build`/`start` funcionando.
