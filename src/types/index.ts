@@ -39,10 +39,13 @@ export interface Usuario {
   id: number;
   apellido: string;
   nombre: string;
+
   /** Formato "YYYY-MM-DD" (ver `dateStrings` en src/database/conexion.ts). */
   fecha_nacimiento: string;
+
   /** Hash bcrypt de 60 caracteres. NUNCA la contraseña en texto plano. */
   password: string;
+
   rol: string;
   email: string;
   telefono: string;
@@ -56,9 +59,7 @@ export interface Usuario {
  * `password`.
  *
  * `Omit<T, "campo">` es una utilidad de TypeScript que copia un tipo quitándole
- * una propiedad. La ventaja de derivarlo en vez de escribir la interfaz a mano:
- * si mañana se agrega una columna a `Usuario`, este tipo la hereda solo, y
- * sigue siendo imposible devolver la password sin que el compilador se queje.
+ * una propiedad.
  */
 export type UsuarioPublico = Omit<Usuario, "password">;
 
@@ -79,10 +80,7 @@ export interface Sede {
 /**
  * Contenido del JWT que se firma en el login.
  *
- * Es lo mínimo que pide la consigna: `id`, `rol` e `id_sede`. Va poco y nada a
- * propósito, porque el payload de un JWT NO está cifrado: cualquiera puede
- * leerlo decodificando base64. La firma garantiza que nadie lo haya
- * modificado, no que sea secreto. Por eso acá nunca viajan datos sensibles.
+ * Es lo mínimo que pide la consigna: `id`, `rol` e `id_sede`.
  */
 export interface PayloadJWT {
   id: number;
@@ -92,18 +90,16 @@ export interface PayloadJWT {
 
 /**
  * Cuerpo ya validado de `POST /auth/registro`.
- *
- * Que un dato tenga este tipo significa que ya pasó por `validarRegistro`: los
- * campos existen, tienen el formato correcto y respetan los largos de las
- * columnas. Los services confían en eso y no vuelven a validar.
  */
 export interface DatosRegistro {
   nombre: string;
   apellido: string;
   dni: string;
   email: string;
-  /** Contraseña en texto plano. Se hashea en el service, nunca se guarda así. */
+
+  /** Contraseña en texto plano. Se hashea en el service. */
   password: string;
+
   telefono: string;
   fecha_nacimiento: string;
   id_cobertura: number;
@@ -113,4 +109,82 @@ export interface DatosRegistro {
 export interface DatosLogin {
   dni: string;
   password: string;
+}
+
+/**
+ * SEMANA 3
+ * ========
+ */
+
+/** Fila de la tabla `agenda`. */
+export interface Agenda {
+  id: number;
+  hora_entrada: string;
+  hora_salida: string;
+  fecha: string;
+  id_medico: number;
+  id_especialidad: number;
+  id_sede: number;
+}
+
+/** Fila de la tabla `turno`. */
+export interface Turno {
+  id: number;
+  nota: string | null;
+  id_agenda: number;
+  fecha: string | null;
+  hora: string | null;
+  id_paciente: number;
+  id_cobertura: number;
+  estado: string;
+}
+
+/**
+ * Datos que recibe el endpoint al solicitar un turno.
+ *
+ * No se recibe `id_cobertura` porque la cobertura se toma automáticamente
+ * de la registrada para el paciente.
+ */
+export interface DatosNuevoTurno {
+  id_especialidad: number;
+  id_sede: number;
+  id_medico: number;
+  fecha: string;
+  hora: string;
+  nota: string;
+
+  /**
+   * Solo se utiliza cuando un operador solicita el turno en nombre
+   * de un paciente.
+   */
+  id_paciente?: number;
+}
+
+/** Fila de la tabla `historial_clinico`. */
+export interface HistorialClinico {
+  id: number;
+  id_turno: number;
+  id_medico: number;
+  id_paciente: number;
+  diagnostico: string;
+  tratamiento: string | null;
+  observaciones: string | null;
+  fecha_registro: string;
+}
+
+/** Datos enviados por el médico para registrar el historial clínico. */
+export interface DatosHistorial {
+  diagnostico: string;
+  tratamiento?: string;
+  observaciones?: string;
+}
+
+/** Fila de la tabla `notificacion`. */
+export interface Notificacion {
+  id: number;
+  id_usuario: number;
+  tipo: string;
+  mensaje: string;
+  leida: number;
+  fecha: string;
 }
