@@ -9,11 +9,12 @@
  * un rango de la agenda del médico, que no haya otro turno confirmado a esa
  * misma hora, de qué cobertura es el paciente— viven en `turno.service.ts`.
  *
- * Sin este archivo, `req.body` llegaba crudo al service: un `id_medico`
- * faltante se convertía en `undefined` dentro de una query parametrizada y
- * mysql2 cortaba con "Bind parameters must not contain undefined", que el
- * manejador de errores traduce a un 500. El criterio de aceptación de la
- * semana pide justo lo contrario: error controlado con el código adecuado.
+ * Sin este archivo, `req.body` llegaba crudo al service y los errores salían
+ * desviados. Un `id_medico` faltante viajaba como `undefined`, que mysql2
+ * traduce a NULL: la búsqueda de agenda no encontraba nada y la respuesta era
+ * "el horario solicitado no está disponible", cuando el problema real era que
+ * faltaba un campo. Devolvía el código correcto pero mentía sobre la causa, que
+ * es de lo peor que le puede pasar a quien consume la API.
  */
 
 import { DatosNuevoTurno } from "../types";
@@ -29,9 +30,12 @@ import {
 /**
  * Largo de `turno.nota` en `docs/clinica_ampliada.sql`.
  *
- * La columna es `varchar(40)`, bastante corta. Sin este control, una nota más
- * larga hace fallar el INSERT con el error 1406 de MySQL ("Data too long") y
- * termina en un 500.
+ * La columna es `varchar(40)`, bastante corta. Qué pasa sin este control
+ * depende del `sql_mode` del servidor, y ninguna de las dos opciones sirve: con
+ * modo estricto el INSERT falla con el error 1406 ("Data too long") y termina
+ * en un 500; sin modo estricto —como el WAMP donde se desarrolló— MySQL trunca
+ * la nota en silencio y el paciente termina con un texto cortado a la mitad sin
+ * que nadie se entere. Validarlo acá deja el comportamiento igual en las dos.
  */
 const MAXIMO_NOTA = 40;
 

@@ -20,8 +20,10 @@ import {
 /**
  * Largo de las tres columnas de texto de `historial_clinico`.
  *
- * Las tres son `varchar(255)`. Se controla en la app porque MySQL en modo
- * estricto rechaza el INSERT con el error 1406 y eso terminaría en un 500.
+ * Las tres son `varchar(255)`. Se controla en la app porque, según el
+ * `sql_mode`, pasarse termina en un 500 (modo estricto, error 1406) o en un
+ * truncado silencioso: un diagnóstico cortado a la mitad es peor que un
+ * rechazo.
  */
 const MAXIMO_TEXTO = 255;
 

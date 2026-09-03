@@ -628,7 +628,7 @@
           ]
         },
         {
-          "name": "POST /turnos sin id_medico → 400, NO 500",
+          "name": "POST /turnos sin id_medico → 400 nombrando el campo",
           "request": {
             "method": "POST",
             "header": [
@@ -668,8 +668,10 @@
                   "    pm.expect(r).to.have.property('estado');",
                   "    pm.expect(r).to.have.property('datos');",
                   "});",
-                  "// Antes del validador, el undefined llegaba a mysql2 y salía un 500.",
-                  "pm.test('No es un 500', () => pm.expect(pm.response.code).to.not.eql(500));",
+                  "// Sin validador esto también daba 400, pero diciendo que el horario no",
+                  "// estaba disponible: mysql2 manda el undefined como NULL y la búsqueda",
+                  "// de agenda no encontraba nada. El código era el correcto y el mensaje",
+                  "// apuntaba a la causa equivocada.",
                   "pm.test('Nombra el campo que falta',",
                   "    () => pm.expect(r.estado).to.include('id_medico'));"
                 ]
@@ -678,7 +680,7 @@
           ]
         },
         {
-          "name": "POST /turnos con nota de más de 40 caracteres → 400, NO 500",
+          "name": "POST /turnos con nota de más de 40 caracteres → 400",
           "request": {
             "method": "POST",
             "header": [
@@ -718,7 +720,11 @@
                   "    pm.expect(r).to.have.property('estado');",
                   "    pm.expect(r).to.have.property('datos');",
                   "});",
-                  "// turno.nota es varchar(40): sin validar, MySQL cortaba con el error 1406.",
+                  "// turno.nota es varchar(40). Sin validar, el resultado depende del",
+                  "// sql_mode: con modo estricto el INSERT falla con el error 1406 y sale",
+                  "// un 500; sin modo estricto MySQL trunca la nota en silencio. Ninguna",
+                  "// de las dos sirve, así que se corta acá y el comportamiento queda",
+                  "// igual en cualquier servidor.",
                   "pm.test('No es un 500', () => pm.expect(pm.response.code).to.not.eql(500));",
                   "pm.test('Habla del largo', () => pm.expect(r.estado).to.include('40'));"
                 ]
