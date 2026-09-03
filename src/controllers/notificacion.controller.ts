@@ -6,6 +6,7 @@
 import { NextFunction, Request, Response } from "express";
 import * as notificacionService from "../services/notificacion.service";
 import { responder } from "../utils/respuesta";
+import { validarIdRuta } from "../validators/comunes";
 
 /**
  * GET /notificaciones
@@ -37,7 +38,7 @@ export async function marcarLeida(
 ): Promise<void> {
   try {
     const usuario = req.usuario!;
-    const id = Number(req.params.id);
+    const id = validarIdRuta(req.params.id);
 
     await notificacionService.marcarComoLeida(id, usuario.id);
 

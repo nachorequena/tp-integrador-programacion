@@ -23,7 +23,28 @@ import { ErrorHttp } from "../utils/errorHttp";
 import * as notificacionService from "./notificacion.service";
 
 /**
+ * Columnas de `turno` con alias `t`, para los listados que hacen JOIN.
+ *
+ * Se listan explícitas en vez de `t.*` para que la forma de la respuesta no
+ * cambie sola si mañana se agrega una columna a la tabla.
+ */
+const SELECT_TURNO = `SELECT
+       t.id, t.nota, t.id_agenda, t.fecha, t.hora,
+       t.id_paciente, t.id_cobertura, t.estado
+     FROM turno t`;
+
+/**
  * Busca la cobertura registrada para un paciente.
+ *
+ * La consigna exige que la cobertura del turno salga de acá y no del cuerpo de
+ * la petición, para que nadie pueda pedir un turno con una cobertura que no le
+ * corresponde. El filtro por `rol = 'paciente'` no es decorativo: impide que un
+ * operador saque un turno a nombre de un médico o de otro operador.
+ *
+ * @param idPaciente Id del paciente titular del turno.
+ * @returns El id de su cobertura.
+ * @throws `ErrorHttp` 404 si no existe un paciente con ese id.
+ * @throws `ErrorHttp` 400 si el paciente no tiene cobertura registrada.
  */
 async function obtenerCoberturaPaciente(
   idPaciente: number,
@@ -52,8 +73,28 @@ async function obtenerCoberturaPaciente(
 }
 
 /**
- * Busca una agenda que coincida con:
- * médico, especialidad, sede y fecha.
+ * Busca el rango de agenda que cubre el horario pedido.
+ *
+ * Es la validación central del alta: la consigna prohíbe dar un turno fuera de
+ * los rangos horarios del médico. Si no hay agenda que lo contenga, no hay
+ * turno posible.
+ *
+ * El rango se compara como texto porque las columnas son `varchar(5)`, no
+ * `time`. Funciona porque "HH:MM" tiene siempre el mismo largo y dos dígitos
+ * por parte, así que el orden alfabético coincide con el cronológico. Depende
+ * de que la hora venga con el cero adelante, y eso lo garantiza
+ * `turno.validators.ts`.
+ *
+ * El límite superior es `<` y no `<=` a propósito: un rango que termina a las
+ * 12:00 no incluye un turno a las 12:00, porque el médico ya se fue.
+ *
+ * @param idMedico Médico elegido.
+ * @param idEspecialidad Especialidad pedida.
+ * @param idSede Sede pedida.
+ * @param fecha Fecha del turno, "YYYY-MM-DD".
+ * @param hora Hora del turno, "HH:MM".
+ * @returns El id de la agenda que cubre ese horario.
+ * @throws `ErrorHttp` 400 si ninguna agenda del médico lo cubre.
  */
 async function buscarAgenda(
   idMedico: number,
@@ -93,8 +134,23 @@ async function buscarAgenda(
 }
 
 /**
- * Controla que no exista otro turno confirmado
- * para la misma agenda, fecha y hora.
+ * Controla que el horario no esté ya tomado.
+ *
+ * Se compara la hora exacta y no un solapamiento por duración porque la tabla
+ * `turno` no tiene columna de duración: el turno es un instante dentro del
+ * rango, no un intervalo.
+ *
+ * Alcanza con mirar la misma agenda porque el alta de agenda (semana 2) ya
+ * rechaza rangos solapados del mismo médico en la misma fecha. Es decir: un
+ * par (médico, fecha, hora) cae como mucho en una agenda. Sin esa garantía,
+ * este chequeo tendría que recorrer todas las agendas del médico.
+ *
+ * Solo bloquean los turnos `confirmado`: uno cancelado libera el horario.
+ *
+ * @param idAgenda Agenda donde cae el turno.
+ * @param fecha Fecha del turno.
+ * @param hora Hora del turno.
+ * @throws `ErrorHttp` 409 si ya hay un turno confirmado a esa hora.
  */
 async function verificarSuperposicion(
   idAgenda: number,
@@ -121,16 +177,29 @@ async function verificarSuperposicion(
 }
 
 /**
- * Crea un nuevo turno confirmado.
+ * Da de alta un turno en estado `confirmado`.
+ *
+ * Orden de las validaciones: primero la cobertura (identifica al paciente),
+ * después la agenda (¿el médico atiende a esa hora?) y por último la
+ * superposición (¿el lugar está libre?). Va de lo más general a lo más
+ * puntual, para que el mensaje de error apunte a la causa real.
+ *
+ * Al confirmarse se genera la notificación para el paciente, como pide la
+ * consigna.
+ *
+ * @param datos Datos del turno, ya validados en formato.
+ * @param idPaciente Titular del turno. Sale del token si lo pide el propio
+ *   paciente, o del cuerpo si lo pide un operador en su representación.
+ * @returns El id del turno creado.
+ * @throws `ErrorHttp` 404 si el paciente no existe.
+ * @throws `ErrorHttp` 400 si el paciente no tiene cobertura o el horario no
+ *   está en la agenda del médico.
+ * @throws `ErrorHttp` 409 si ya hay un turno confirmado a esa hora.
  */
 export async function crearTurno(
   datos: DatosNuevoTurno,
   idPaciente: number,
 ): Promise<number> {
-  if (!datos.nota || datos.nota.trim() === "") {
-    throw new ErrorHttp(400, "La nota es obligatoria");
-  }
-
   const idCobertura =
     await obtenerCoberturaPaciente(idPaciente);
 
@@ -181,6 +250,10 @@ export async function crearTurno(
 
 /**
  * Busca un turno por id.
+ *
+ * @param idTurno Id del turno.
+ * @returns La fila del turno.
+ * @throws `ErrorHttp` 404 si no existe.
  */
 export async function buscarTurnoPorId(
   idTurno: number,
@@ -209,7 +282,24 @@ export async function buscarTurnoPorId(
 }
 
 /**
- * Cancela un turno.
+ * Cancela un turno y notifica al paciente.
+ *
+ * Las reglas de acceso son distintas según quién cancela, y por eso no alcanza
+ * con `verificarRol`:
+ *   - `paciente`: solo el suyo.
+ *   - `operador`: cualquiera de su sede.
+ *   - `medico`: los de su sede que además sean suyos.
+ *
+ * La sede y el médico se leen de la agenda del turno, no del turno: `turno` no
+ * guarda esos datos, los hereda del rango de agenda al que pertenece.
+ *
+ * @param idTurno Turno a cancelar.
+ * @param idUsuario Id de quien cancela, del token.
+ * @param rol Rol de quien cancela, del token.
+ * @param idSedeUsuario Sede de quien cancela. Es `null` para los pacientes.
+ * @throws `ErrorHttp` 404 si el turno o su agenda no existen.
+ * @throws `ErrorHttp` 400 si el turno no está confirmado.
+ * @throws `ErrorHttp` 403 si el turno no le corresponde a quien cancela.
  */
 export async function cancelarTurno(
   idTurno: number,
@@ -287,7 +377,18 @@ export async function cancelarTurno(
 }
 
 /**
- * Marca un turno como atendido.
+ * Marca un turno como `atendido` y notifica al paciente.
+ *
+ * Se dejó la carga del historial clínico como un paso posterior —la consigna
+ * admite las dos variantes—; los dos registros quedan asociados por
+ * `historial_clinico.id_turno`.
+ *
+ * @param idTurno Turno a atender.
+ * @param idMedico Médico que atiende, del token.
+ * @param idSedeMedico Sede del médico, del token.
+ * @throws `ErrorHttp` 404 si el turno o su agenda no existen.
+ * @throws `ErrorHttp` 400 si el turno no está confirmado.
+ * @throws `ErrorHttp` 403 si el turno es de otro médico o de otra sede.
  */
 export async function atenderTurno(
   idTurno: number,
@@ -352,7 +453,10 @@ export async function atenderTurno(
 }
 
 /**
- * Turnos del paciente autenticado.
+ * Turnos del paciente autenticado, del más próximo al menos próximo.
+ *
+ * @param idPaciente Id del paciente, tomado del token.
+ * @returns Sus turnos, ordenados por fecha y hora ascendente.
  */
 export async function listarTurnosPaciente(
   idPaciente: number,
@@ -377,15 +481,21 @@ export async function listarTurnosPaciente(
 }
 
 /**
- * Turnos del médico para una fecha determinada.
+ * Turnos programados de un médico para una fecha.
+ *
+ * El JOIN con `agenda` es necesario porque `turno` no guarda el médico: lo
+ * hereda del rango de agenda en el que cae.
+ *
+ * @param idMedico Id del médico, tomado del token.
+ * @param fecha Fecha a consultar, "YYYY-MM-DD".
+ * @returns Sus turnos de ese día, ordenados por hora.
  */
 export async function listarTurnosMedico(
   idMedico: number,
   fecha: string,
-): Promise<RowDataPacket[]> {
+): Promise<Turno[]> {
   const [filas] = await pool.query<RowDataPacket[]>(
-    `SELECT t.*
-     FROM turno t
+    `${SELECT_TURNO}
      INNER JOIN agenda a ON a.id = t.id_agenda
      WHERE a.id_medico = ?
        AND t.fecha = ?
@@ -393,19 +503,22 @@ export async function listarTurnosMedico(
     [idMedico, fecha],
   );
 
-  return filas;
+  return filas as Turno[];
 }
 
 /**
- * Turnos de una sede para una fecha determinada.
+ * Turnos de una sede para una fecha, para uso del operador.
+ *
+ * @param idSede Id de la sede, tomado del token del operador.
+ * @param fecha Fecha a consultar, "YYYY-MM-DD".
+ * @returns Los turnos de esa sede ese día, ordenados por hora.
  */
 export async function listarTurnosSede(
   idSede: number,
   fecha: string,
-): Promise<RowDataPacket[]> {
+): Promise<Turno[]> {
   const [filas] = await pool.query<RowDataPacket[]>(
-    `SELECT t.*
-     FROM turno t
+    `${SELECT_TURNO}
      INNER JOIN agenda a ON a.id = t.id_agenda
      WHERE a.id_sede = ?
        AND t.fecha = ?
@@ -413,5 +526,5 @@ export async function listarTurnosSede(
     [idSede, fecha],
   );
 
-  return filas;
+  return filas as Turno[];
 }

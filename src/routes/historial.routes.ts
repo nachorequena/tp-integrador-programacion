@@ -1,6 +1,17 @@
 /**
  * RUTAS: /historial
- * ==================
+ * =================
+ *
+ * Alta y consulta del historial clínico.
+ *
+ *   POST /:idTurno            medico — registra el resultado de la consulta
+ *   GET  /mio                 paciente — la totalidad de su historial
+ *   GET  /paciente/:idPaciente medico — solo lo que él mismo registró
+ *
+ * Hay dos endpoints de lectura y no uno con filtros porque la consigna define
+ * dos vistas distintas del mismo dato. Separarlas permite que el destinatario
+ * salga siempre del token: ni el paciente ni el médico pueden pedir el
+ * historial de otro cambiando un número en la URL.
  */
 
 import { Router } from "express";

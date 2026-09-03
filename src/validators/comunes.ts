@@ -164,6 +164,38 @@ export function validarTextoObligatorio(
 }
 
 /**
+ * Valida un campo de texto OPCIONAL con un largo máximo.
+ *
+ * La diferencia con `validarTextoObligatorio` es qué significa que falte: acá
+ * un campo ausente o vacío es válido y se traduce a `undefined`, para que el
+ * service lo mande como `NULL` a una columna que lo admite.
+ *
+ * @param valor Valor crudo recibido.
+ * @param nombreCampo Nombre del campo, para el mensaje de error.
+ * @param maximo Largo máximo permitido, según la columna.
+ * @param errores Array donde se acumulan los errores encontrados.
+ * @returns El texto recortado, o `undefined` si no vino.
+ */
+export function validarTextoOpcional(
+  valor: unknown,
+  nombreCampo: string,
+  maximo: number,
+  errores: string[],
+): string | undefined {
+  if (valor === undefined || valor === null || valor === "") return undefined;
+
+  const texto = textoLimpio(valor);
+
+  if (!texto) return undefined;
+
+  if (texto.length > maximo) {
+    errores.push(`${nombreCampo} no puede superar ${maximo} caracteres`);
+  }
+
+  return texto;
+}
+
+/**
  * Comprueba que el cuerpo recibido sea un objeto antes de leerle propiedades.
  *
  * Cubre el body ausente y los JSON que son un número, un texto o `null`.
