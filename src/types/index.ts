@@ -39,13 +39,10 @@ export interface Usuario {
   id: number;
   apellido: string;
   nombre: string;
-
   /** Formato "YYYY-MM-DD" (ver `dateStrings` en src/database/conexion.ts). */
   fecha_nacimiento: string;
-
   /** Hash bcrypt de 60 caracteres. NUNCA la contraseña en texto plano. */
   password: string;
-
   rol: string;
   email: string;
   telefono: string;
@@ -59,7 +56,9 @@ export interface Usuario {
  * `password`.
  *
  * `Omit<T, "campo">` es una utilidad de TypeScript que copia un tipo quitándole
- * una propiedad.
+ * una propiedad. La ventaja de derivarlo en vez de escribir la interfaz a mano:
+ * si mañana se agrega una columna a `Usuario`, este tipo la hereda solo, y
+ * sigue siendo imposible devolver la password sin que el compilador se queje.
  */
 export type UsuarioPublico = Omit<Usuario, "password">;
 
@@ -77,10 +76,49 @@ export interface Sede {
   telefono: string;
 }
 
+/** Fila de la tabla `especialidad`. Ojo: el campo es `descripcion`, no `nombre`. */
+export interface Especialidad {
+  id: number;
+  descripcion: string;
+}
+
+/**
+ * Fila de la tabla `agenda`: un rango horario que un médico atiende en una
+ * sede, para una especialidad y una fecha concretas.
+ *
+ * Las horas son `varchar(5)` en la base ("15:00"), no un tipo `time`.
+ */
+export interface Agenda {
+  id: number;
+  hora_entrada: string;
+  hora_salida: string;
+  /** Formato "YYYY-MM-DD". */
+  fecha: string;
+  id_medico: number;
+  id_especialidad: number;
+  id_sede: number;
+}
+
+/**
+ * Fila de agenda con los nombres resueltos por JOIN.
+ *
+ * Es lo que devuelve el listado: con los ids sueltos, quien consume la API
+ * necesitaría una llamada extra por cada uno para saber de qué médico, sede o
+ * especialidad se trata.
+ */
+export interface AgendaDetallada extends Agenda {
+  medico: string;
+  especialidad: string;
+  sede: string;
+}
+
 /**
  * Contenido del JWT que se firma en el login.
  *
- * Es lo mínimo que pide la consigna: `id`, `rol` e `id_sede`.
+ * Es lo mínimo que pide la consigna: `id`, `rol` e `id_sede`. Va poco y nada a
+ * propósito, porque el payload de un JWT NO está cifrado: cualquiera puede
+ * leerlo decodificando base64. La firma garantiza que nadie lo haya
+ * modificado, no que sea secreto. Por eso acá nunca viajan datos sensibles.
  */
 export interface PayloadJWT {
   id: number;
@@ -90,16 +128,18 @@ export interface PayloadJWT {
 
 /**
  * Cuerpo ya validado de `POST /auth/registro`.
+ *
+ * Que un dato tenga este tipo significa que ya pasó por `validarRegistro`: los
+ * campos existen, tienen el formato correcto y respetan los largos de las
+ * columnas. Los services confían en eso y no vuelven a validar.
  */
 export interface DatosRegistro {
   nombre: string;
   apellido: string;
   dni: string;
   email: string;
-
-  /** Contraseña en texto plano. Se hashea en el service. */
+  /** Contraseña en texto plano. Se hashea en el service, nunca se guarda así. */
   password: string;
-
   telefono: string;
   fecha_nacimiento: string;
   id_cobertura: number;
@@ -111,14 +151,25 @@ export interface DatosLogin {
   password: string;
 }
 
-/**
- * SEMANA 3
- * ========
- */
+/** Cuerpo ya validado del alta/modificación de una sede. */
+export interface DatosSede {
+  nombre: string;
+  direccion: string;
+  telefono: string;
+}
 
-/** Fila de la tabla `agenda`. */
-export interface Agenda {
-  id: number;
+/** Cuerpo ya validado del alta/modificación de una especialidad. */
+export interface DatosEspecialidad {
+  descripcion: string;
+}
+
+/** Cuerpo ya validado del alta/modificación de una cobertura. */
+export interface DatosCobertura {
+  nombre: string;
+}
+
+/** Cuerpo ya validado del alta/modificación de una agenda. */
+export interface DatosAgenda {
   hora_entrada: string;
   hora_salida: string;
   fecha: string;
@@ -127,23 +178,49 @@ export interface Agenda {
   id_sede: number;
 }
 
-/** Fila de la tabla `turno`. */
+/**
+ * Filtros del listado de agenda, ya validados. Los tres son opcionales y se
+ * combinan entre sí (`GET /agendas?id_sede=1&fecha=2025-10-20`).
+ */
+export interface FiltrosAgenda {
+  id_medico?: number;
+  id_sede?: number;
+  fecha?: string;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SEMANA 3 — turnos, historial clínico y notificaciones
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Fila de la tabla `turno`.
+ *
+ * `fecha` y `hora` se guardan duplicadas respecto de la agenda a propósito: la
+ * agenda define el rango (08:00–12:00) y el turno el momento puntual dentro de
+ * ese rango. `hora` es `varchar(5)` como en agenda, no un tipo `time`.
+ */
 export interface Turno {
   id: number;
+  /** `varchar(40)` en la base: el largo se valida antes de insertar. */
   nota: string | null;
   id_agenda: number;
+  /** Formato "YYYY-MM-DD". */
   fecha: string | null;
+  /** Formato "HH:MM". */
   hora: string | null;
   id_paciente: number;
   id_cobertura: number;
+  /** `confirmado` | `cancelado` | `atendido`. */
   estado: string;
 }
 
 /**
- * Datos que recibe el endpoint al solicitar un turno.
+ * Cuerpo ya validado de `POST /turnos`.
  *
- * No se recibe `id_cobertura` porque la cobertura se toma automáticamente
- * de la registrada para el paciente.
+ * No incluye `id_cobertura` a propósito: la consigna exige que la cobertura se
+ * tome de la registrada por el paciente y que no pueda pisarse desde el
+ * endpoint. Al no estar en el tipo, el service no puede leerla del body ni por
+ * accidente.
  */
 export interface DatosNuevoTurno {
   id_especialidad: number;
@@ -152,11 +229,7 @@ export interface DatosNuevoTurno {
   fecha: string;
   hora: string;
   nota: string;
-
-  /**
-   * Solo se utiliza cuando un operador solicita el turno en nombre
-   * de un paciente.
-   */
+  /** Solo lo manda un operador que saca el turno en nombre de un paciente. */
   id_paciente?: number;
 }
 
@@ -172,14 +245,19 @@ export interface HistorialClinico {
   fecha_registro: string;
 }
 
-/** Datos enviados por el médico para registrar el historial clínico. */
+/** Cuerpo ya validado de `POST /historial/:idTurno`. */
 export interface DatosHistorial {
   diagnostico: string;
   tratamiento?: string;
   observaciones?: string;
 }
 
-/** Fila de la tabla `notificacion`. */
+/**
+ * Fila de la tabla `notificacion`.
+ *
+ * `leida` es `tinyint(1)`: MySQL no tiene booleano real, así que viaja como
+ * 0 o 1 y se tipa como `number` para no mentir sobre lo que llega.
+ */
 export interface Notificacion {
   id: number;
   id_usuario: number;

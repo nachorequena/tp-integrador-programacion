@@ -113,6 +113,24 @@ export async function existeEmail(email: string): Promise<boolean> {
 }
 
 /**
+ * Comprueba que exista un usuario con ese id Y que su rol sea `medico`.
+ *
+ * La usa el alta de agenda. No alcanza con que el id exista: `agenda.id_medico`
+ * apunta a `usuario`, que contiene a todos los roles, así que sin esta
+ * comprobación se podría cargar la agenda de un paciente o de un administrativo.
+ *
+ * @param id Id de usuario recibido como `id_medico`.
+ * @returns `true` si existe y es médico.
+ */
+export async function esMedico(id: number): Promise<boolean> {
+  const [filas] = await pool.query<RowDataPacket[]>(
+    "SELECT 1 FROM usuario WHERE id = ? AND rol = 'medico' LIMIT 1",
+    [id],
+  );
+  return filas.length > 0;
+}
+
+/**
  * Inserta un paciente nuevo.
  *
  * Dos valores se fijan acá y no llegan desde el cliente, a propósito:
