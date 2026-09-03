@@ -143,6 +143,31 @@ Ejemplo de error:
 | PUT    | `/agendas/:id` | `medico`, `operador`, `admin`  | Modificación                             |
 | DELETE | `/agendas/:id` | `medico`, `operador`, `admin`  | Baja (valida turnos asociados)           |
 
+### Turnos, historial clínico y notificaciones (semana 3)
+
+| Método | Ruta                          | Protección              | Descripción                                        |
+| ------ | ----------------------------- | ----------------------- | -------------------------------------------------- |
+| POST   | `/turnos`                     | `paciente`, `operador`  | Alta. El paciente para sí; el operador en su nombre |
+| GET    | `/turnos/mios`                | `paciente`              | Sus turnos, del más próximo al menos próximo        |
+| GET    | `/turnos/medico?fecha=`       | `medico`                | Turnos programados del médico para esa fecha        |
+| GET    | `/turnos/sede?fecha=`         | `operador`              | Turnos de su sede para esa fecha                    |
+| PATCH  | `/turnos/:id/cancelar`        | `paciente`, `operador`, `medico` | Pasa el turno a `cancelado`               |
+| PATCH  | `/turnos/:id/atender`         | `medico`                | Pasa el turno a `atendido`                          |
+| POST   | `/historial/:idTurno`         | `medico`                | Registra diagnóstico, tratamiento y observaciones   |
+| GET    | `/historial/mio`              | `paciente`              | La totalidad de su historial                        |
+| GET    | `/historial/paciente/:id`     | `medico`                | Solo los registros que cargó ese médico             |
+| GET    | `/notificaciones`             | `verificarToken`        | Las propias, de más reciente a más antigua          |
+| PATCH  | `/notificaciones/:id/leida`   | `verificarToken`        | Marca una notificación propia como leída            |
+
+Detalles que vale la pena tener a mano:
+
+- **La cobertura del turno no se recibe por el body.** Se toma de la registrada por el paciente, para que nadie pueda pedir un turno con una cobertura que no le corresponde. El campo ni siquiera existe en el tipo que valida la petición.
+- **El horario tiene que caer dentro de un rango de la agenda del médico.** Si no, la respuesta es un 400 que lo dice. El límite superior es exclusivo: un rango que termina a las 12:00 no admite un turno a las 12:00.
+- **No hay endpoint para crear notificaciones.** Se generan solas al confirmar, cancelar o atender un turno, siempre con `leida = 0`. Un endpoint de alta permitiría falsificarlas.
+- **Se usa PATCH y no PUT** en cancelar, atender y marcar como leída, porque no se reemplaza el recurso: se cambia un solo campo.
+- **La carga del historial es un paso posterior a la atención** —la consigna admite las dos variantes—; los dos registros quedan asociados por `historial_clinico.id_turno`.
+- **El rol `admin` no participa de esta entrega.** La consigna enumera qué rol usa cada endpoint y no lo menciona en ninguno, así que no se le dio acceso.
+
 El listado acepta tres filtros combinables por query string:
 
 ```
@@ -214,16 +239,27 @@ También se puede crear un paciente nuevo con `POST /auth/registro`; queda siemp
 
 ## Colecciones de Postman
 
-En [postman/](postman/) hay dos, una por entrega:
+En [postman/](postman/) hay una por entrega:
 
 | Archivo | Contenido |
 | ------- | --------- |
 | `Clinica-Backend-Semana1.postman_collection.json` | Autenticación: registro, login, perfil (14 requests) |
 | `Clinica-Backend-Semana2.postman_collection.json` | CRUD de sedes, especialidades, coberturas y agenda (52 requests) |
+| `Clinica-Backend-Semana3.postman_collection.json` | Turnos, historial clínico y notificaciones (56 requests) |
 
 Importarlas en Postman (**Import** → arrastrar el archivo) y ejecutar las carpetas **en orden**.
 
 **Semana 2** — la carpeta `0. Autenticación` guarda los tokens de los cinco usuarios en variables de colección; el resto de las carpetas los usa. Es **idempotente**: todo lo que crea lo borra al final, así que se puede correr las veces que haga falta y siempre da verde.
+
+**Semana 3** — arranca creando su propia agenda con los endpoints de la semana 2, porque el alta de turno valida contra ella. Cada corrida usa una **fecha distinta**, generada en el pre-request de esa primera llamada, así que es idempotente sin necesidad de limpiar nada entre corridas.
+
+Los tres casos que pide la consigna están señalados con un comentario en el test:
+
+| Caso | Dónde |
+| ---- | ----- |
+| Turno rechazado por horario no disponible | carpeta `2. Alta de turno` |
+| Turno cancelado que genera notificación   | carpeta `4. Cancelación de turno` |
+| Turno atendido con su historial asociado  | carpeta `5. Atención de turno e historial clínico` |
 
 **Semana 1** — el primer request da de alta el paciente `40123456`. Para una corrida completa repetida hay que borrarlo antes:
 
