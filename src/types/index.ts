@@ -266,3 +266,85 @@ export interface Notificacion {
   leida: number;
   fecha: string;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SEMANA 4 — auditoría, reportes y cierre
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Acciones que registra la auditoría.
+ *
+ * Los tres valores salen textuales de la consigna. Se tipan como unión y no
+ * como `string` para que sea imposible escribir "MODIFICACIÓN" con acento o
+ * "modificacion" en minúscula y ensuciar el log sin que nadie se dé cuenta.
+ */
+export type AccionAuditoria = "ALTA" | "BAJA" | "MODIFICACION";
+
+/** Fila de la tabla `log_auditoria`. */
+export interface LogAuditoria {
+  id: number;
+  id_usuario: number;
+  accion: AccionAuditoria;
+  entidad: string;
+  id_entidad: number | null;
+  detalle: string | null;
+  fecha: string;
+}
+
+/** Datos con los que el middleware arma una entrada del log. */
+export interface EntradaAuditoria {
+  id_usuario: number;
+  accion: AccionAuditoria;
+  entidad: string;
+  id_entidad: number | null;
+  detalle: string | null;
+}
+
+/**
+ * Filtros del listado de auditoría, ya validados.
+ *
+ * Los cuatro son opcionales y se combinan con AND.
+ */
+export interface FiltrosAuditoria {
+  id_usuario?: number;
+  entidad?: string;
+  desde?: string;
+  hasta?: string;
+}
+
+/**
+ * Rango de fechas de los reportes, ya validado.
+ *
+ * Ambos extremos son opcionales e inclusivos: sin ninguno, el reporte abarca
+ * todo el histórico.
+ */
+export interface RangoFechas {
+  desde?: string;
+  hasta?: string;
+}
+
+/** Una fila de los reportes que cuentan turnos agrupados por algo. */
+export interface ConteoTurnos {
+  id: number;
+  nombre: string;
+  cantidad: number;
+}
+
+/** Una fila del ranking de médicos por turnos atendidos. */
+export interface MedicoRanking {
+  id_medico: number;
+  medico: string;
+  atendidos: number;
+}
+
+/**
+ * Resultado del reporte de tasa de cancelación.
+ *
+ * `tasa` viaja como número entre 0 y 1 con dos decimales, no como el texto
+ * "12%": darle formato es problema de quien lo muestra, no de la API.
+ */
+export interface TasaCancelacion {
+  total: number;
+  cancelados: number;
+  tasa: number;
+}

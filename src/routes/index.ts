@@ -19,10 +19,12 @@
 
 import { Router } from "express";
 import { rutasAgenda } from "./agenda.routes";
+import { rutasAuditoria } from "./auditoria.routes";
 import { rutasAuth } from "./auth.routes";
 import { rutasCobertura } from "./cobertura.routes";
 import { rutasEspecialidad } from "./especialidad.routes";
 import { rutasHealth } from "./health.routes";
+import { rutasReporte } from "./reporte.routes";
 import { rutasSede } from "./sede.routes";
 import { rutasTurno } from "./turno.routes";
 import { rutasHistorial } from "./historial.routes";
@@ -45,3 +47,7 @@ rutas.use("/agendas", rutasAgenda); //          medico (la propia), operador y a
 rutas.use("/turnos", rutasTurno); //            paciente/operador crean, medico atiende
 rutas.use("/historial", rutasHistorial); //     medico registra, paciente consulta el suyo
 rutas.use("/notificaciones", rutasNotificacion); // cada uno las propias, cualquier rol
+
+// Semana 4 — auditoría y reportes
+rutas.use("/auditoria", rutasAuditoria); //     admin
+rutas.use("/reportes", rutasReporte); //        admin
