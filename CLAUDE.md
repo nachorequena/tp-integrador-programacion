@@ -501,7 +501,24 @@ En cualquier caso: dejar documentadas las credenciales de prueba en el README (e
 > Mantené esta sección al día para conservar contexto entre sesiones de Claude Code.
 > Semanas más recientes arriba.
 
-**Semana en curso:** Semana 2 ✅ entregada. **Pendiente:** esperar la consigna de la semana 3.
+**Semana en curso:** Semana 3 ✅ entregada. **Pendiente:** arrancar la semana 4 (`docs/Backend-semana 4.pdf`).
+
+### Semana 3 — Turnos, historial clínico y notificaciones
+
+- **Estado:** ✅ Completa y verificada end-to-end. **142/142 asserts** en verde (56 requests), más **86/86** de la semana 2 sin regresiones.
+- **Rama:** `entrega-backend-3`. La escribió el compañero; esta sesión la corrigió.
+- **Hecho por el compañero:** los 11 endpoints de la consigna (turnos, historial, notificaciones), con la lógica de negocio correcta.
+- **Corregido en esta sesión:**
+  - **La rama salía de la semana 1, no de la 2.** El entregable pide el proyecto "actualizado sobre la base de la semana 2", y sin el CRUD de agenda no se puede cargar un rango horario contra el cual reservar: la entrega no se podía demostrar sola. Se mergeó `main` (2 conflictos: `routes/index.ts` y `types/index.ts`).
+  - **`src/index.ts` auto-mergeaba sin conflicto y se comía la documentación.** Ojo con esto si vuelve a pasar: git no avisa. Se recuperó la versión de `main`.
+  - **Faltaba la colección de Postman**, que la consigna pide nominalmente con tres casos. Se armó de cero: 56 requests, idempotente (verificado con tres corridas seguidas sin limpiar).
+  - **Faltaban los validators.** Se agregaron `turno.validators.ts` e `historial.validators.ts`, siguiendo el patrón de `comunes.ts`.
+- **Notas / decisiones tomadas:**
+  - **El rol `admin` NO participa de la semana 3.** La consigna enumera qué rol usa cada endpoint y no lo nombra en ninguno. Se decidió no dárselo, a diferencia de la agenda en la semana 2 (ahí tampoco lo nombraba, pero era incoherente que administrara sedes y no pudiera ver una agenda).
+  - **La superposición de turnos se detecta por hora exacta**, no por duración: la tabla `turno` no tiene columna de duración. Alcanza con mirar la misma agenda **porque la semana 2 ya prohíbe rangos solapados** del mismo médico y fecha. Buen punto para la defensa: sin la semana 2, este chequeo tendría agujeros.
+  - **El historial se carga como paso posterior a la atención** (la consigna admite las dos variantes); quedan asociados por `historial_clinico.id_turno`.
+  - **⚠️ El WAMP local NO está en modo estricto** (`sql_mode = IGNORE_SPACE`). Consecuencia: pasarse del largo de una columna **trunca en silencio** en vez de dar error 1406. La máquina del docente probablemente sí sea estricta, así que los largos se validan en la app. Esto también significa que el gotcha 1 de la sección 7 (`telefono` NOT NULL → error 1364) no se reproduce localmente.
+  - **Dos hallazgos de la revisión inicial eran falsos** y se corrigieron tras verificar contra la base: ni el campo faltante ni la nota larga daban 500. El que sí era real: `"9:00"` sin cero adelante se rechazaba como "horario no disponible", porque las horas se comparan como texto.
 
 ### Semana 2 — CRUD de sedes, especialidades, coberturas y agenda
 
