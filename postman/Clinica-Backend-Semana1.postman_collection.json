@@ -50,12 +50,12 @@
       "name": "2. Coberturas",
       "item": [
         {
-          "name": "GET /coberturas — listado público (200)",
+          "name": "GET /coberturas/disponibles — listado público (200)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{baseUrl}}/coberturas", "host": ["{{baseUrl}}"], "path": ["coberturas"] },
-            "description": "Servicio que recupera las coberturas disponibles para elegir en el registro."
+            "url": { "raw": "{{baseUrl}}/coberturas/disponibles", "host": ["{{baseUrl}}"], "path": ["coberturas", "disponibles"] },
+            "description": "Servicio que recupera las coberturas disponibles para elegir en el registro.\n\nOJO: en la semana 1 esta ruta era `/coberturas`. En la semana 2 se movió a `/coberturas/disponibles` porque `/coberturas` pasó a ser el CRUD restringido al rol admin (el criterio de aceptación de esa entrega exige que responda 403 a cualquier otro rol). El comportamiento público que necesita el registro es el mismo, solo cambió la URL."
           },
           "event": [
             {

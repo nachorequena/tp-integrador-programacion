@@ -1,6 +1,9 @@
 # TP Integrador — Sistema de Gestión de Turnos Médicos (Backend)
 
-Programación 2 — Backend, **Semana 1**: setup, conexión a la base y autenticación con JWT.
+Programación 2 — Etapa backend.
+
+- **Semana 1** ✅ — setup, conexión a la base y autenticación con JWT.
+- **Semana 2** ✅ — CRUD de sedes, especialidades, coberturas y agenda médica (rama `entrega-backend-2`).
 
 Stack: Node.js + Express 5 + TypeScript + MySQL/MariaDB (`mysql2` con SQL crudo, sin ORM), JWT y bcrypt.
 
@@ -24,7 +27,15 @@ mysql -u root -p clinica < docs/clinica_ampliada.sql
 
 (o importarlo desde phpMyAdmin / Adminer con la base `clinica` ya seleccionada).
 
-### 2. Configurar el entorno
+### 2. Cargar los usuarios de prueba
+
+```bash
+mysql -u root -p clinica < scripts/usuarios-prueba.sql
+```
+
+**Sin este paso no se puede probar casi nada.** Los cuatro usuarios que trae el script de la cátedra tienen hashes de contraseña falsos (`$2b$10$hashdeejemplo1`), así que ninguno puede iniciar sesión y sin sesión no hay forma de demostrar los permisos por rol. El script les pone contraseñas reales y agrega un segundo médico. Es idempotente y **no modifica el `.sql` de la cátedra**.
+
+### 3. Configurar el entorno
 
 ```bash
 cp .env.example .env
@@ -45,7 +56,7 @@ Completar `.env` con las credenciales reales:
 
 > `.env` está en `.gitignore` y **no se versiona**. El que sí se versiona es `.env.example`.
 
-### 3. Instalar y levantar
+### 4. Instalar y levantar
 
 ```bash
 npm install
@@ -94,125 +105,136 @@ Ejemplo de error:
 
 ## Endpoints
 
-| Método | Ruta             | Protección                        | Descripción                              |
-| ------ | ---------------- | --------------------------------- | ---------------------------------------- |
-| GET    | `/health`        | pública                           | Estado del servidor y de la base         |
-| GET    | `/coberturas`    | pública                           | Coberturas disponibles para el registro  |
-| POST   | `/auth/registro` | pública                           | Alta de paciente                         |
-| POST   | `/auth/login`    | pública                           | Devuelve el JWT                          |
-| GET    | `/auth/perfil`   | `verificarToken`                  | Datos del usuario logueado               |
-| GET    | `/sedes`         | `verificarToken` + `verificarRol('admin')` | Listado de sedes                |
+### Autenticación y salud (semana 1)
 
-### `POST /auth/registro`
+| Método | Ruta             | Protección       | Descripción                       |
+| ------ | ---------------- | ---------------- | --------------------------------- |
+| GET    | `/health`        | pública          | Estado del servidor y de la base  |
+| POST   | `/auth/registro` | pública          | Alta de paciente                  |
+| POST   | `/auth/login`    | pública          | Devuelve el JWT                   |
+| GET    | `/auth/perfil`   | `verificarToken` | Datos del usuario logueado        |
+
+### Sedes, especialidades y coberturas (semana 2)
+
+| Método | Ruta                      | Protección | Descripción                              |
+| ------ | ------------------------- | ---------- | ---------------------------------------- |
+| GET    | `/coberturas/disponibles` | **pública** | Listado de solo lectura para el registro |
+| GET    | `/sedes`                  | `admin`    | Listado                                  |
+| POST   | `/sedes`                  | `admin`    | Alta: `nombre`, `direccion`, `telefono`  |
+| PUT    | `/sedes/:id`              | `admin`    | Modificación                             |
+| DELETE | `/sedes/:id`              | `admin`    | Baja (valida dependencias)               |
+| GET    | `/especialidades`         | `admin`    | Listado                                  |
+| POST   | `/especialidades`         | `admin`    | Alta: `descripcion`                      |
+| PUT    | `/especialidades/:id`     | `admin`    | Modificación                             |
+| DELETE | `/especialidades/:id`     | `admin`    | Baja (valida dependencias)               |
+| GET    | `/coberturas`             | `admin`    | Listado del CRUD                         |
+| POST   | `/coberturas`             | `admin`    | Alta: `nombre`                           |
+| PUT    | `/coberturas/:id`         | `admin`    | Modificación                             |
+| DELETE | `/coberturas/:id`         | `admin`    | Baja (valida dependencias)               |
+
+> **¿Por qué `/coberturas` y `/coberturas/disponibles`?** El criterio de aceptación exige que los endpoints de coberturas sean accesibles *únicamente* por admin (403 para el resto), pero la consigna también pide un servicio de solo lectura reutilizable desde el registro de pacientes, que es público y no lleva token. Las dos cosas no entran en la misma ruta. En la semana 1 el listado público era `/coberturas`; ahora es `/coberturas/disponibles`.
+
+### Agenda médica (semana 2)
+
+| Método | Ruta           | Protección                     | Descripción                              |
+| ------ | -------------- | ------------------------------ | ---------------------------------------- |
+| GET    | `/agendas`     | `medico`, `operador`, `admin`  | Listado filtrable                        |
+| POST   | `/agendas`     | `medico`, `operador`, `admin`  | Alta de un rango horario                 |
+| PUT    | `/agendas/:id` | `medico`, `operador`, `admin`  | Modificación                             |
+| DELETE | `/agendas/:id` | `medico`, `operador`, `admin`  | Baja (valida turnos asociados)           |
+
+El listado acepta tres filtros combinables por query string:
+
+```
+GET /agendas?id_medico=3&id_sede=1&fecha=2025-10-20
+```
+
+Cuerpo del alta y la modificación:
 
 ```json
 {
-  "nombre": "Paciente",
-  "apellido": "DePrueba",
-  "dni": "40123456",
-  "email": "paciente.prueba@test.com",
-  "password": "secreto123",
-  "telefono": "3424111000",
-  "fecha_nacimiento": "1999-05-20",
-  "id_cobertura": 1
+  "hora_entrada": "08:00",
+  "hora_salida": "12:00",
+  "fecha": "2026-12-15",
+  "id_medico": 3,
+  "id_especialidad": 1,
+  "id_sede": 1
 }
 ```
 
-- El rol se asigna automáticamente como `paciente` e `id_sede` queda en `null`.
-- La contraseña se guarda hasheada con bcrypt (10 salt rounds). Nunca vuelve en la respuesta.
-- `dni` y `email` duplicados → **409**.
-- `id_cobertura` inexistente → **400**.
+**Reglas de acceso.** El rol `paciente` recibe 403 en los cuatro endpoints. El `operador` y el `admin` gestionan la agenda de cualquier médico y sede. El `medico` solo la propia:
 
-> ⚠️ **`telefono` no figura en la consigna**, pero la columna `usuario.telefono` es `NOT NULL` y no tiene valor por defecto en el script provisto: un `INSERT` sin ese campo falla con `Error 1364`. Por eso se pide como campo obligatorio, en vez de modificar el `.sql` de la cátedra.
+- si intenta crear una agenda con otro `id_medico` → **403**;
+- si intenta modificar o borrar una agenda ajena → **403**;
+- en el listado se le fuerza el filtro a su propio id, aunque pida otro por query.
 
-### `POST /auth/login`
-
-```json
-{ "dni": "40123456", "password": "secreto123" }
-```
-
-Devuelve el token y los datos públicos del usuario:
-
-```json
-{
-  "codigo": 200,
-  "estado": "ok",
-  "datos": {
-    "token": "eyJhbGciOi...",
-    "usuario": { "id": 5, "nombre": "Paciente", "rol": "paciente", "id_sede": null }
-  }
-}
-```
-
-El payload del JWT contiene `id`, `rol` e `id_sede`. Credenciales incorrectas → **401** con mensaje genérico (no se revela si falló el dni o la contraseña).
+**Validaciones.** Horas en formato `HH:MM` con entrada anterior a salida · fecha `YYYY-MM-DD` real · el `id_medico` debe existir y tener rol `medico` · especialidad y sede deben existir · el rango **no puede solaparse** con otro del mismo médico ese día (409). Sí se permiten varios rangos por día que no se pisen, e incluso contiguos (08:00-12:00 y 12:00-16:00).
 
 ### Middlewares
 
 - **`verificarToken`** — valida firma y vencimiento del JWT del header `Authorization: Bearer <token>`. Si falta, es inválido o expiró → **401**. Deja el payload en `req.usuario`.
 - **`verificarRol(...roles)`** — valida que `req.usuario.rol` esté entre los permitidos → si no, **403**. Se monta siempre después de `verificarToken`.
 
+La pertenencia de cada fila de agenda **no** la resuelve `verificarRol` (un middleware de rol no sabe de quién es cada registro): eso se valida en `agenda.service.ts`.
+
+---
+
+## Borrado con dependencias
+
+No se puede eliminar una entidad que esté en uso: el intento devuelve **409** con el detalle de qué la está usando, nunca un 500.
+
+| DELETE de      | Bloqueado por                                                    |
+| -------------- | ---------------------------------------------------------------- |
+| `sede`         | `usuario.id_sede`, `agenda.id_sede`                              |
+| `especialidad` | `medico_especialidad.id_especialidad`, `agenda.id_especialidad` * |
+| `cobertura`    | `usuario.id_cobertura`, `turno.id_cobertura` *                   |
+| `agenda`       | `turno.id_agenda` *                                              |
+
+Las marcadas con `*` no figuran en la consigna, pero son claves foráneas reales del script: sin validarlas, esos borrados fallarían con un error del motor y terminarían en un 500, que es justo lo que el criterio de aceptación prohíbe.
+
 ---
 
 ## Credenciales de prueba
 
-Los usuarios que vienen en el script tienen **hashes de contraseña falsos** (`$2b$10$hashdeejemplo1`), así que **ninguno puede loguearse**: el login les responde 401. Para probar el sistema hay que crear usuarios reales.
+Disponibles después de correr `scripts/usuarios-prueba.sql`:
 
-### Paciente
+| DNI        | Contraseña    | Rol        | Usuario         |
+| ---------- | ------------- | ---------- | --------------- |
+| `18222333` | `admin123`    | `admin`    | Marcos Gomez    |
+| `15200548` | `operador123` | `operador` | Juan Perez      |
+| `20111222` | `medico123`   | `medico`   | Ana Lopez       |
+| `25333444` | `medico123`   | `medico`   | Carlos Ruiz     |
+| `36000960` | `paciente123` | `paciente` | Franco Friggeri |
 
-Registrar uno con `POST /auth/registro` (queda con rol `paciente`). El de la colección de Postman:
+Carlos Ruiz no viene en el script de la cátedra: lo agrega `usuarios-prueba.sql`. Con un solo médico sería imposible demostrar que un médico no puede modificar la agenda de otro, porque no habría "otro".
 
-| DNI        | Contraseña   |
-| ---------- | ------------ |
-| `40123456` | `secreto123` |
-
-### Usuario admin de prueba
-
-El registro público solo crea pacientes, así que para probar el caso exitoso de `verificarRol` en `GET /sedes` hace falta cargarle un hash real al admin del seed (Marcos Gomez, DNI `18222333`).
-
-Generar el hash:
-
-```bash
-node -e "console.log(require('bcrypt').hashSync('admin123', 10))"
-```
-
-Y aplicarlo:
-
-```sql
-UPDATE usuario SET password = '<hash generado>' WHERE dni = '18222333';
-```
-
-Esto **no modifica el script provisto**: es un `UPDATE` puntual sobre los datos ya cargados.
-
-| DNI        | Contraseña | Rol     |
-| ---------- | ---------- | ------- |
-| `18222333` | `admin123` | `admin` |
+También se puede crear un paciente nuevo con `POST /auth/registro`; queda siempre con rol `paciente`.
 
 ---
 
-## Colección de Postman
+## Colecciones de Postman
 
-En [postman/](postman/) está `Clinica-Backend-Semana1.postman_collection.json`. Importarla en Postman y ejecutar las carpetas en orden (1 → 6).
+En [postman/](postman/) hay dos, una por entrega:
 
-- El request de **login guarda el JWT automáticamente** en la variable de colección `token`; los endpoints protegidos ya lo usan.
-- La variable `baseUrl` apunta a `http://localhost:3000`.
-- Incluye los casos negativos que pide el enunciado: 400 de validación, 409 de duplicados, 401 sin token / token inválido y 403 por rol.
+| Archivo | Contenido |
+| ------- | --------- |
+| `Clinica-Backend-Semana1.postman_collection.json` | Autenticación: registro, login, perfil (14 requests) |
+| `Clinica-Backend-Semana2.postman_collection.json` | CRUD de sedes, especialidades, coberturas y agenda (52 requests) |
 
-### Corrida completa: 14 requests, 36 asserts, todo en verde
+Importarlas en Postman (**Import** → arrastrar el archivo) y ejecutar las carpetas **en orden**.
 
-Con **Run collection** se ejecutan los 14 requests de una. El resultado esperado es **36/36 asserts en verde**.
+**Semana 2** — la carpeta `0. Autenticación` guarda los tokens de los cinco usuarios en variables de colección; el resto de las carpetas los usa. Es **idempotente**: todo lo que crea lo borra al final, así que se puede correr las veces que haga falta y siempre da verde.
 
-⚠️ Para que dé todo verde, el paciente de prueba **no tiene que existir** todavía: el primer request lo da de alta y espera un **201**. Si ya se corrió antes, ese request devuelve 409 (el DNI ya está registrado) y falla 1 assert. Antes de cada corrida completa:
+**Semana 1** — el primer request da de alta el paciente `40123456`. Para una corrida completa repetida hay que borrarlo antes:
 
 ```sql
 DELETE FROM usuario WHERE dni = '40123456';
 ```
 
-No hace falta si se ejecutan los requests de a uno: los demás funcionan con el paciente ya creado.
-
-También se puede correr desde la terminal, sin instalar nada en el proyecto:
+Las dos se pueden correr desde la terminal sin instalar nada en el proyecto:
 
 ```bash
-npx newman run postman/Clinica-Backend-Semana1.postman_collection.json
+npx newman run postman/Clinica-Backend-Semana2.postman_collection.json
 ```
 
 ---
@@ -225,12 +247,16 @@ src/
 ├── database/conexion.ts       # pool de mysql2 + ping para /health
 ├── controllers/               # reciben req/res y delegan en los services
 ├── services/                  # lógica de negocio + SQL parametrizado
+│   └── dependencias.service.ts  # chequeo de FKs antes de un DELETE
 ├── middlewares/               # verificarToken, verificarRol, manejadorErrores
 ├── routes/                    # definición y montaje de rutas
 ├── validators/                # validación de los cuerpos de las peticiones
+│   └── comunes.ts               # helpers compartidos por todos
 ├── utils/                     # respuesta uniforme, JWT, ErrorHttp
 ├── types/                     # interfaces de las entidades
 └── index.ts                   # arranque de Express
+scripts/
+└── usuarios-prueba.sql        # contraseñas reales para poder loguearse
 ```
 
-Convenciones: identificadores en español, replicando la nomenclatura de la base. Queries siempre parametrizadas con `?`. Controladores finos, lógica en los services.
+Convenciones: identificadores en español, replicando la nomenclatura de la base. Queries siempre parametrizadas con `?`. Controladores finos, lógica en los services. Todo el código documentado (ver `CLAUDE.md`, sección 4.1).

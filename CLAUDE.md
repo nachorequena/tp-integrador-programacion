@@ -20,7 +20,8 @@
 Las fuentes originales están en la carpeta `docs/` del repo. Ante cualquier duda sobre nombres, campos o alcance, **la fuente manda sobre lo que esté acá resumido**:
 
 - `docs/Enunciado-General.docx.pdf` — reglas generales del TP (formato de respuesta, entregas, evaluación).
-- `docs/Backend-semana-1.pdf` — consigna detallada de la semana en curso.
+- `docs/Backend-semana-1.pdf` — consigna de la semana 1 (entregada).
+- `docs/Backend-semana-2.pdf` — **consigna de la semana en curso.**
 - `docs/clinica_ampliada.sql` — **script de la base. Es la fuente de verdad de los nombres exactos de tablas y columnas.** No inventes nombres: leé este archivo.
 
 > Cuando salga la consigna de la semana siguiente, se agrega su PDF a `docs/` y se actualiza la sección de alcance vigente (9) y la bitácora (14).
@@ -57,11 +58,13 @@ Esto fuerza a cargar el contexto y da un punto de control antes de generar nada,
 El enunciado es explícito: cada entrega debe enfocarse **solo en lo que toca esa semana**, sin adelantarse.
 
 - **No** implementes tablas, endpoints ni lógica de semanas futuras aunque la base de datos ya las tenga.
-- La base `clinica_ampliada.sql` incluye 10 tablas, pero en la **semana 1 solo se usan `usuario`, `sede` y `cobertura`** (esta última porque el registro la necesita).
-- Si tenés que crear estructura de carpetas o abstracciones "para después", hacelo solo si **no agrega complejidad hoy**. Nada de módulos vacíos de turnos, agenda, historial, etc.
+- La base `clinica_ampliada.sql` incluye 10 tablas. Acumulado hasta la semana 2 se usan **`usuario`, `sede`, `cobertura`, `especialidad`, `medico_especialidad` y `agenda`**.
+- **`turno` es semana 3+**: la única interacción permitida hoy es un `SELECT` de existencia para validar dependencias antes de un `DELETE` (sin esa lectura, el borrado revienta con un error de FK → 500, que el criterio de aceptación prohíbe). Nada de CRUD de turnos.
+- `historial_clinico`, `log_auditoria` y `notificacion` no se tocan.
+- Si tenés que crear estructura de carpetas o abstracciones "para después", hacelo solo si **no agrega complejidad hoy**.
 - Ante la duda de si algo pertenece a esta semana: **preguntá antes de codear**.
 
-**Alcance vigente:** Semana 1 (setup, conexión a DB, autenticación). Ver sección 9.
+**Alcance vigente:** Semana 2 (CRUD de sedes, especialidades, coberturas y agenda). Ver sección 9.
 
 ---
 
@@ -154,14 +157,19 @@ src/
 │   └── conexion.ts        # pool de conexión mysql2
 ├── controllers/           # reciben req/res, delegan en services
 │   ├── auth.controller.ts
+│   ├── agenda.controller.ts
 │   ├── cobertura.controller.ts
+│   ├── especialidad.controller.ts
 │   ├── sede.controller.ts
 │   └── health.controller.ts
 ├── services/              # lógica de negocio + acceso a datos (SQL)
 │   ├── auth.service.ts
 │   ├── usuario.service.ts
+│   ├── agenda.service.ts
 │   ├── cobertura.service.ts
-│   └── sede.service.ts
+│   ├── especialidad.service.ts
+│   ├── sede.service.ts
+│   └── dependencias.service.ts  # chequeo de FKs antes de un DELETE
 ├── middlewares/
 │   ├── verificarToken.ts
 │   ├── verificarRol.ts
@@ -169,17 +177,27 @@ src/
 ├── routes/
 │   ├── index.ts           # monta todas las rutas
 │   ├── auth.routes.ts
+│   ├── agenda.routes.ts
 │   ├── cobertura.routes.ts
+│   ├── especialidad.routes.ts
 │   ├── sede.routes.ts
 │   └── health.routes.ts
 ├── utils/
 │   ├── respuesta.ts       # helper de respuesta uniforme
+│   ├── errorHttp.ts       # error de negocio con código HTTP
 │   └── jwt.ts             # firmar/verificar tokens
 ├── validators/
-│   └── auth.validators.ts # validaciones de registro/login
+│   ├── comunes.ts         # helpers compartidos (texto, fecha, hora, ids)
+│   ├── auth.validators.ts
+│   ├── agenda.validators.ts
+│   └── entidades.validators.ts  # sede, especialidad y cobertura
 ├── types/
-│   └── index.ts
+│   ├── index.ts
+│   └── express.d.ts       # agrega req.usuario al Request de Express
 └── index.ts               # arranque de Express
+
+scripts/
+└── usuarios-prueba.sql    # contraseñas reales + 2do médico (ver sección 9)
 ```
 
 > La consigna pide textualmente `src/controllers`, `src/routes` y `src/database` ("o similar"). Se usan los tres con el nombre literal: cuesta cero y elimina cualquier objeción en la corrección.
@@ -276,9 +294,96 @@ JWT_EXPIRES_IN=1d
 
 ---
 
-## 9. Alcance de la SEMANA 1
+## 9. Alcance de la SEMANA 2 (VIGENTE)
+
+> Entregable en la rama **`entrega-backend-2`** (lo pide textualmente la consigna).
 
 ### Endpoints a entregar
+
+**Sedes** — todos `verificarToken` + `verificarRol('admin')`
+
+| Método | Ruta         | Descripción                                    |
+| ------ | ------------ | ---------------------------------------------- |
+| GET    | `/sedes`     | Listado (ya existía de la semana 1)            |
+| POST   | `/sedes`     | Alta: `nombre`, `direccion`, `telefono`        |
+| PUT    | `/sedes/:id` | Modificación                                   |
+| DELETE | `/sedes/:id` | Baja, previa validación de dependencias        |
+
+**Especialidades** — todos `admin`. `GET`, `POST`, `PUT/:id`, `DELETE/:id` sobre `/especialidades` (campo `descripcion`).
+
+**Coberturas** — campo `nombre`
+
+| Método | Ruta                      | Protección | Descripción                                  |
+| ------ | ------------------------- | ---------- | -------------------------------------------- |
+| GET    | `/coberturas/disponibles` | **pública** | Servicio de solo lectura para el registro   |
+| GET    | `/coberturas`             | `admin`    | Listado del CRUD                             |
+| POST   | `/coberturas`             | `admin`    | Alta                                         |
+| PUT    | `/coberturas/:id`         | `admin`    | Modificación                                 |
+| DELETE | `/coberturas/:id`         | `admin`    | Baja, previa validación de dependencias      |
+
+> **Por qué dos rutas de listado.** El criterio de aceptación exige que los endpoints de coberturas sean accesibles *únicamente* por admin (403 para el resto), pero la consigna también pide un servicio de solo lectura reutilizable desde el registro, que es público. Ambas cosas no entran en la misma ruta: `/coberturas/disponibles` resuelve el registro y `/coberturas` cumple el 403. El nombre sale del propio enunciado ("liste las coberturas **disponibles**").
+
+**Agenda** (`/agendas`) — `verificarToken` + `verificarRol('medico', 'operador', 'admin')`. El rol `paciente` recibe 403 en los cuatro.
+
+| Método | Ruta            | Descripción                                                    |
+| ------ | --------------- | -------------------------------------------------------------- |
+| GET    | `/agendas`      | Listado filtrable por `id_medico`, `id_sede` y `fecha` (query)  |
+| POST   | `/agendas`      | Alta de un rango horario                                        |
+| PUT    | `/agendas/:id`  | Modificación                                                    |
+| DELETE | `/agendas/:id`  | Baja, previa validación de turnos asociados                     |
+
+No se implementa `GET /:id` de ningún recurso: la consigna pide alta, listado, modificación y baja.
+
+### 🔒 Reglas de rol de la agenda (row-level, no alcanza `verificarRol`)
+
+`verificarRol` solo mira el rol; la pertenencia de la fila se valida en el service:
+
+- **POST** — un `medico` solo puede crear agenda con `id_medico` = su propio id; si manda otro → **403**. `operador`/`admin` pueden usar cualquiera.
+- **PUT / DELETE** — se lee la fila primero: no existe → **404**; existe pero es de otro médico y el rol es `medico` → **403**.
+- **GET** — al `medico` se le fuerza el filtro a su propio id, ignorando lo que venga por query. `operador`/`admin` filtran libremente.
+
+### ⚠️ Validaciones de dependencia antes de borrar (INNEGOCIABLE)
+
+El criterio de aceptación exige un error controlado, **nunca un 500**. La consigna lista menos dependencias de las que realmente existen en el script; las marcadas con 🔴 no están en el enunciado pero producen un error de FK si no se validan:
+
+| DELETE de     | Bloqueado por                                             |
+| ------------- | --------------------------------------------------------- |
+| `sede`        | `usuario.id_sede`, `agenda.id_sede`                        |
+| `especialidad`| `medico_especialidad.id_especialidad`, 🔴 `agenda.id_especialidad` |
+| `cobertura`   | `usuario.id_cobertura`, 🔴 `turno.id_cobertura`            |
+| `agenda`      | 🔴 `turno.id_agenda`                                       |
+
+Todas responden **409** con un mensaje que indique qué la está usando.
+
+### Validaciones de datos de la agenda
+
+- `hora_entrada` / `hora_salida`: formato `HH:MM` (la columna es `varchar(5)`), y entrada **<** salida.
+- `fecha`: `YYYY-MM-DD` y fecha real.
+- `id_medico`: debe existir **y tener rol `medico`** (si no, se podría agendar a un paciente).
+- `id_especialidad` e `id_sede`: deben existir.
+- **Sin solapamiento**: se rechaza con 409 si el rango pisa otro del mismo médico en la misma fecha (en el `PUT` se excluye la propia fila). Un médico no puede estar en dos lugares a la vez.
+- Varios rangos por día para el mismo médico están permitidos, siempre que no se solapen.
+
+### Criterios de aceptación (checklist de la semana 2)
+
+- [ ] El proyecto levanta con `npm run dev` sin errores.
+- [ ] Sedes, especialidades y coberturas responden **403** a cualquier rol que no sea `admin`.
+- [ ] El `medico` solo accede y modifica su propia agenda; el `operador` puede con cualquiera.
+- [ ] No se puede eliminar sede, especialidad ni cobertura con dependencias: devuelve error controlado, **no 500**.
+- [ ] Todas las respuestas (éxito y error) siguen el formato uniforme.
+- [ ] Colección de Postman con los endpoints de esta entrega.
+- [ ] Todo entregado en la rama `entrega-backend-2`.
+
+### Datos del seed útiles para probar
+
+- **Sede Norte (id 2)** no tiene usuarios ni agenda → sirve para el DELETE exitoso.
+- **Sede Centro (id 1)**, **especialidad 1**, **cobertura 1** y **agenda 2** tienen dependencias → sirven para los cuatro 409.
+
+---
+
+## 9.1 Semana 1 — ENTREGADA ✅ (referencia)
+
+### Endpoints entregados
 
 | Método | Ruta             | Protección                                 | Descripción                                                               |
 | ------ | ---------------- | ------------------------------------------ | ------------------------------------------------------------------------- |
@@ -360,17 +465,27 @@ En cualquier caso: dejar documentadas las credenciales de prueba en el README (e
 
 ---
 
-## 12. Entregables de la semana 1
+## 12. Entregables de la semana 2
+
+1. Repositorio actualizado sobre la base de la semana 1, **en la rama `entrega-backend-2`**.
+2. CRUD de sedes, especialidades, coberturas y agenda médica, protegidos por rol.
+3. Colección de Postman de estos endpoints (exportada al repo, carpeta `postman/`).
+
+<details>
+<summary>Entregables de la semana 1 (cumplidos)</summary>
 
 1. Repositorio con el backend inicializado y funcionando.
 2. Endpoints `POST /auth/registro`, `POST /auth/login`, `GET /auth/perfil` operativos.
-3. Colección de Postman con las pruebas de esos tres endpoints (exportar el `.json` al repo, carpeta `postman/`).
+3. Colección de Postman con las pruebas de esos tres endpoints.
+
+</details>
 
 ---
 
 ## 13. Qué NO hacer (guardrails)
 
-- ❌ No implementar turnos, agenda, historial clínico, notificaciones ni auditoría (semanas futuras).
+- ❌ No implementar turnos, historial clínico, notificaciones ni auditoría (semanas futuras). **La agenda sí entra desde la semana 2.**
+- ❌ De `turno` solo se lee para validar dependencias antes de un `DELETE`. Nada de altas, bajas ni modificaciones de turnos.
 - ❌ No usar ORM. SQL crudo con `mysql2`.
 - ❌ No dejar contraseñas en texto plano en ningún lado.
 - ❌ No armar respuestas fuera del helper `responder`.
@@ -384,8 +499,32 @@ En cualquier caso: dejar documentadas las credenciales de prueba en el README (e
 ## 14. Bitácora de progreso (actualizar al final de cada sesión)
 
 > Mantené esta sección al día para conservar contexto entre sesiones de Claude Code.
+> Semanas más recientes arriba.
 
-- **Semana en curso:** Semana 1 — Setup, conexión y autenticación.
+**Semana en curso:** Semana 2 ✅ entregada. **Pendiente:** esperar la consigna de la semana 3.
+
+### Semana 2 — CRUD de sedes, especialidades, coberturas y agenda
+
+- **Estado:** ✅ Completa y verificada end-to-end. **86/86 asserts** en verde (52 requests), más **36/36** de la semana 1 sin regresiones.
+- **Rama:** `entrega-backend-2`, como exige la consigna.
+- **Hecho:**
+  - 16 endpoints nuevos: CRUD completo de sedes, especialidades, coberturas y agenda.
+  - Validación de dependencias antes de cada `DELETE`, cubriendo **todas** las FKs reales (409, nunca 500).
+  - Reglas de rol de la agenda: el médico solo la propia (validación por fila en el service), operador y admin cualquiera, paciente 403.
+  - Control de solapamiento de rangos horarios por médico y fecha.
+  - `scripts/usuarios-prueba.sql` versionado e idempotente (verificado corriéndolo dos veces).
+  - Colección de Postman de la semana 2, idempotente (verificado con dos corridas seguidas sin limpiar).
+- **Notas / decisiones tomadas:**
+  - **`administrador` del PDF = `admin` en la base.** La consigna escribe "administrador" pero el seed carga `admin`; manda la base. Documentado por si el docente objeta.
+  - **`GET /coberturas` dejó de ser público.** El criterio de aceptación exige 403 para todo rol que no sea admin, pero la consigna también pide un listado de solo lectura para el registro (que es público). No entran en la misma ruta: el público pasó a `GET /coberturas/disponibles` y se actualizó la colección de la semana 1.
+  - **El `admin` puede gestionar agenda igual que el `operador`.** La consigna no lo menciona; se decidió así porque sería incoherente que administre sedes y especialidades pero no pueda ver una agenda.
+  - **Se rechazan los rangos solapados** (409). La consigna solo pide permitir varios por día; los contiguos (08:00-12:00 y 12:00-16:00) sí se aceptan.
+  - **Segundo médico (Carlos Ruiz, dni 25333444)** agregado por el script de pruebas. El seed trae uno solo y con un único médico es imposible demostrar el criterio "el médico solo modifica su propia agenda".
+  - La consigna lista **menos dependencias de las que existen**: faltan `agenda.id_especialidad`, `turno.id_cobertura` y `turno.id_agenda`. Se validan igual, porque si no el `DELETE` termina en un 500.
+  - De `turno` (semana 3+) solo se hace `SELECT COUNT(*)` para las dependencias. Nada más.
+
+### Semana 1 — Setup, conexión y autenticación
+
 - **Estado:** ✅ Completa y verificada end-to-end (46/46 pruebas manuales contra la base real).
 - **Hecho:**
   - Proyecto inicializado: Express 5 + TypeScript 7, scripts `dev`/`build`/`start` funcionando.
