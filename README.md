@@ -168,6 +168,46 @@ Detalles que vale la pena tener a mano:
 - **La carga del historial es un paso posterior a la atención** —la consigna admite las dos variantes—; los dos registros quedan asociados por `historial_clinico.id_turno`.
 - **El rol `admin` no participa de esta entrega.** La consigna enumera qué rol usa cada endpoint y no lo menciona en ninguno, así que no se le dio acceso.
 
+### Auditoría y reportes (semana 4)
+
+| Método | Ruta                                  | Protección | Descripción                                       |
+| ------ | ------------------------------------- | ---------- | ------------------------------------------------- |
+| GET    | `/auditoria`                          | `admin`    | Log filtrable por usuario, entidad y rango de fechas |
+| GET    | `/reportes/turnos-por-especialidad`   | `admin`    | Conteo agrupado                                   |
+| GET    | `/reportes/turnos-por-sede`           | `admin`    | Conteo agrupado                                   |
+| GET    | `/reportes/ranking-medicos`           | `admin`    | Médicos por turnos atendidos, la lista completa   |
+| GET    | `/reportes/tasa-cancelacion`          | `admin`    | Cancelados sobre el total del período             |
+| GET    | `/docs`                               | **pública** | Documentación Swagger de toda la API             |
+
+Los cuatro reportes aceptan `?desde=&hasta=` (opcional, inclusivo en ambos extremos, sobre `turno.fecha`). Sin rango, abarcan todo el histórico.
+
+#### Cómo funciona la auditoría
+
+El criterio de aceptación pide que cada alta, baja o modificación quede registrada **"automáticamente, sin código repetido en cada endpoint"**. Por eso no hay una sola línea de auditoría en los controllers ni en los services: lo resuelve [auditoria.ts](src/middlewares/auditoria.ts), un middleware montado una única vez en [index.ts](src/index.ts).
+
+Envuelve `res.json`. Cuando un controller responde, el wrapper mira el status y el cuerpo, y si la operación salió bien y figura en la tabla de rutas auditadas, escribe la entrada. Responde primero y audita después, sin `await`: la auditoría no le agrega latencia a la respuesta.
+
+Se auditan `usuario`, `sede`, `especialidad`, `cobertura`, `agenda` y `turno`. Las cuatro primeras las nombra el entregable; agenda y turnos se sumaron porque son los movimientos más frecuentes de la clínica y su ausencia dejaría el log ciego justo donde más pasa.
+
+**No** se auditan las lecturas (no modifican nada), el login, el historial clínico ni el marcado de notificaciones como leídas.
+
+La tabla de rutas es explícita en vez de deducir la acción del verbo HTTP, porque el verbo no alcanza: los turnos se cancelan y se atienden con `PATCH`, que son acciones distintas, y `PATCH /notificaciones/:id/leida` también es `PATCH` y no debe registrarse.
+
+> ⚠️ **`log_auditoria.id` es `tinyint`: tope de 127 filas.** Se decidió no tocar el esquema de la cátedra, así que la escritura del log es **no fatal**: si falla, avisa por consola y la operación de negocio termina bien igual. Un ciclo completo de las cuatro colecciones consume ~20 entradas. Para resetear:
+>
+> ```sql
+> DELETE FROM log_auditoria WHERE id > 1;
+> ALTER TABLE log_auditoria AUTO_INCREMENT = 2;
+> ```
+
+#### Documentación de la API
+
+`GET /docs` sirve la especificación OpenAPI 3 con **Swagger UI**. Cubre los 37 endpoints de las cuatro semanas, cada uno con método, ruta, parámetros, cuerpo esperado, respuestas de éxito y de error, y el rol que puede usarlo.
+
+Es pública a propósito: si pidiera token, quien tiene que aprender a consumir la API necesitaría saber consumirla antes para conseguirlo. No expone datos, solo la forma de los endpoints.
+
+La spec vive en [openapi.ts](src/docs/openapi.ts) como objeto TypeScript y no como YAML: así no hace falta una dependencia extra para parsearla y el compilador verifica que esté bien formada.
+
 El listado acepta tres filtros combinables por query string:
 
 ```
@@ -246,10 +286,13 @@ En [postman/](postman/) hay una por entrega:
 | `Clinica-Backend-Semana1.postman_collection.json` | Autenticación: registro, login, perfil (14 requests) |
 | `Clinica-Backend-Semana2.postman_collection.json` | CRUD de sedes, especialidades, coberturas y agenda (52 requests) |
 | `Clinica-Backend-Semana3.postman_collection.json` | Turnos, historial clínico y notificaciones (56 requests) |
+| `Clinica-Backend-Semana4.postman_collection.json` | Auditoría, reportes y consistencia (50 requests) |
 
 Importarlas en Postman (**Import** → arrastrar el archivo) y ejecutar las carpetas **en orden**.
 
 **Semana 2** — la carpeta `0. Autenticación` guarda los tokens de los cinco usuarios en variables de colección; el resto de las carpetas los usa. Es **idempotente**: todo lo que crea lo borra al final, así que se puede correr las veces que haga falta y siempre da verde.
+
+**Semana 4** — verifica que la auditoría se dispare sola, que las lecturas y los intentos fallidos **no** dejen rastro, y que cancelar o atender un turno mueva los reportes en la consulta siguiente. Los reportes se consultan filtrados por una fecha exclusiva de cada corrida, así los conteos son deterministas sin importar qué haya acumulado la base.
 
 **Semana 3** — arranca creando su propia agenda con los endpoints de la semana 2, porque el alta de turno valida contra ella. Cada corrida usa una **fecha distinta**, generada en el pre-request de esa primera llamada, así que es idempotente sin necesidad de limpiar nada entre corridas.
 

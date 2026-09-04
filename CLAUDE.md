@@ -501,7 +501,28 @@ En cualquier caso: dejar documentadas las credenciales de prueba en el README (e
 > Mantené esta sección al día para conservar contexto entre sesiones de Claude Code.
 > Semanas más recientes arriba.
 
-**Semana en curso:** Semana 3 ✅ entregada. **Pendiente:** arrancar la semana 4 (`docs/Backend-semana 4.pdf`).
+**Semana en curso:** Semana 4 ✅ entregada. **Backend completo.** **Pendiente:** etapa 2, frontend con Angular (semanas 5-8).
+
+### Semana 4 — Auditoría, reportes y cierre
+
+- **Estado:** ✅ Completa y verificada end-to-end. **146/146 asserts** en verde (50 requests). Sin regresiones: semana 1 **36/36**, semana 2 **86/86**, semana 3 **142/142**.
+- **Rama:** `entrega-backend-4`.
+- **Hecho:**
+  - Auditoría automática vía middleware (`src/middlewares/auditoria.ts`), montado una sola vez. Cero código de auditoría en controllers y services, como exige el criterio.
+  - `GET /auditoria` con filtros por usuario, entidad y rango de fechas, solo admin.
+  - Los cuatro reportes con filtro por rango de fechas, solo admin.
+  - Swagger UI en `GET /docs` documentando los 37 endpoints de las cuatro semanas.
+  - Colección de Postman de la semana 4, idempotente (verificada con dos corridas seguidas).
+- **Notas / decisiones tomadas:**
+  - **Tabla explícita de rutas auditadas, no mapeo por verbo HTTP.** El verbo no alcanza: los turnos se cancelan y atienden con `PATCH` (acciones distintas con el mismo método), y `PATCH /notificaciones/:id/leida` también es `PATCH` y no debe auditarse. Agregar un endpoint al log es agregar un renglón a esa tabla.
+  - **Se audita agenda y turno además de las cuatro entidades del entregable.** Decisión del grupo: son los movimientos más frecuentes y sin ellos el log queda ciego justo donde más pasa.
+  - **`cancelar` se registra como `BAJA` y `atender` como `MODIFICACION`.** Un turno cancelado deja de estar vigente aunque la fila siga existiendo.
+  - **En el registro público el actor del log es el propio usuario creado.** No hay token, y la columna `id_usuario` es NOT NULL con FK. Verificado: `id_entidad` e `id_usuario` coinciden en esa entrada.
+  - **⚠️ `log_auditoria.id` es `tinyint`: tope de 127 filas.** Se optó por NO tocar el esquema y hacer la escritura **no fatal** (avisa por consola, la operación de negocio termina bien). Un ciclo completo de las cuatro colecciones consume ~20 entradas. El SQL para vaciarlo está en el README.
+  - **No se lee `req.params` en el middleware.** Los controllers son `async`, y para cuando llaman a `res.json` Express puede haber restaurado los params de la capa exterior. Se parsea `req.originalUrl`, que es determinista.
+  - **Swagger sobre Postman** para la documentación, autorizado por el humano (agrega `swagger-ui-express` y sus tipos). La spec es un objeto TypeScript, no un YAML: evita una tercera dependencia y la valida el compilador.
+  - **Los reportes se calculan en el momento**, sin tablas ni columnas derivadas. Por eso cancelar un turno mueve la tasa en la consulta siguiente sin ningún paso intermedio, que es justo lo que pide el punto de cierre.
+  - **Los reportes usan `LEFT JOIN` desde la entidad, no `INNER JOIN` desde `turno`**, para que una sede o especialidad sin movimiento aparezca con 0 en vez de desaparecer. El filtro de fechas va en el `ON` y no en el `WHERE`: en un LEFT JOIN, una condición sobre la tabla derecha puesta en el WHERE lo convierte en un INNER.
 
 ### Semana 3 — Turnos, historial clínico y notificaciones
 

@@ -1,0 +1,2477 @@
+{
+  "info": {
+    "name": "Clínica — Backend Semana 4",
+    "description": "TP Integrador Programación 2 — Auditoría, reportes y cierre.\n\nREQUISITO PREVIO: ejecutar una vez `scripts/usuarios-prueba.sql`.\n\nCÓMO CORRERLA: Runner sobre la colección entera, de arriba hacia abajo. Las carpetas dependen entre sí.\n\nIDEMPOTENTE: cada corrida genera su propia fecha de prueba y los reportes se consultan filtrados por esa fecha, así los números son deterministas sin importar lo que haya dejado una corrida anterior.\n\n⚠️ OJO CON EL LOG: `log_auditoria.id` es `tinyint`, o sea 127 filas como máximo. Cada corrida completa del set de colecciones consume ~20. Cuando se llena, la auditoría deja de registrar (avisa por consola) pero las operaciones siguen funcionando. Para resetear:\n\n    DELETE FROM log_auditoria WHERE id > 1;\n    ALTER TABLE log_auditoria AUTO_INCREMENT = 2;\n\nLos criterios de aceptación de la semana se verifican en:\n  · auditoría automática sin código en los endpoints → carpeta 2\n  · 403 para todo rol que no sea admin               → carpetas 1 y 3\n  · reportes filtrables por rango de fechas          → carpeta 3\n  · cancelar un turno actualiza los reportes         → carpeta 4",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token_admin",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_operador",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_medico",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_paciente",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_admin",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_medico",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_paciente",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fecha_test",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_sede_test",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_agenda_test",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_turno_a",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "id_turno_b",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "logs_antes",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Autenticación (correr primero)",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"18222333\",\n  \"password\": \"admin123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code !== 200) {",
+                  "    console.error('Ejecutaste scripts/usuarios-prueba.sql?');",
+                  "} else {",
+                  "    const r = pm.response.json();",
+                  "    pm.collectionVariables.set('token_admin', r.datos.token);",
+                  "    pm.test('Rol admin', () => pm.expect(r.datos.usuario.rol).to.eql('admin'));",
+                  "    pm.collectionVariables.set('id_admin', r.datos.usuario.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login operador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"15200548\",\n  \"password\": \"operador123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code !== 200) {",
+                  "    console.error('Ejecutaste scripts/usuarios-prueba.sql?');",
+                  "} else {",
+                  "    const r = pm.response.json();",
+                  "    pm.collectionVariables.set('token_operador', r.datos.token);",
+                  "    pm.test('Rol operador', () => pm.expect(r.datos.usuario.rol).to.eql('operador'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login médico (Ana Lopez)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"20111222\",\n  \"password\": \"medico123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code !== 200) {",
+                  "    console.error('Ejecutaste scripts/usuarios-prueba.sql?');",
+                  "} else {",
+                  "    const r = pm.response.json();",
+                  "    pm.collectionVariables.set('token_medico', r.datos.token);",
+                  "    pm.test('Rol medico', () => pm.expect(r.datos.usuario.rol).to.eql('medico'));",
+                  "    pm.collectionVariables.set('id_medico', r.datos.usuario.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login paciente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"36000960\",\n  \"password\": \"paciente123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code !== 200) {",
+                  "    console.error('Ejecutaste scripts/usuarios-prueba.sql?');",
+                  "} else {",
+                  "    const r = pm.response.json();",
+                  "    pm.collectionVariables.set('token_paciente', r.datos.token);",
+                  "    pm.test('Rol paciente', () => pm.expect(r.datos.usuario.rol).to.eql('paciente'));",
+                  "    pm.collectionVariables.set('id_paciente', r.datos.usuario.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Auditoría — consulta y protección por rol",
+      "item": [
+        {
+          "name": "GET /auditoria sin token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 401);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria como paciente → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_paciente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 403);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "// CRITERIO: el endpoint de auditoría es solo para admin."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria como operador → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_operador}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 403);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria como médico → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_medico}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 403);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria como admin → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Devuelve un array', () => pm.expect(r.datos).to.be.an('array'));",
+                  "pm.test('Cada entrada trae los campos que pide la consigna', () => {",
+                  "    if (r.datos.length === 0) return;",
+                  "    const l = r.datos[0];",
+                  "    pm.expect(l).to.have.property('id_usuario');",
+                  "    pm.expect(l).to.have.property('accion');",
+                  "    pm.expect(l).to.have.property('entidad');",
+                  "    pm.expect(l).to.have.property('detalle');",
+                  "    pm.expect(l).to.have.property('fecha');",
+                  "});",
+                  "pm.test('Resuelve el nombre del usuario, no solo el id', () => {",
+                  "    if (r.datos.length === 0) return;",
+                  "    pm.expect(r.datos[0]).to.have.property('usuario');",
+                  "});",
+                  "pm.test('De la más reciente a la más antigua', () => {",
+                  "    for (let i = 1; i < r.datos.length; i++) {",
+                  "        pm.expect(r.datos[i - 1].fecha >= r.datos[i].fecha).to.be.true;",
+                  "    }",
+                  "});",
+                  "// Se guarda el total para comprobar más adelante que las lecturas",
+                  "// NO generan entradas.",
+                  "pm.collectionVariables.set('logs_antes', r.datos.length);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria?entidad=sede → filtra por entidad",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?entidad=sede",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "entidad",
+                  "value": "sede"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Todas son de la entidad pedida',",
+                  "    () => r.datos.forEach((l) => pm.expect(l.entidad).to.eql('sede')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria?id_usuario= → filtra por usuario",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?id_usuario={{id_admin}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "id_usuario",
+                  "value": "{{id_admin}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Todas son del usuario pedido', () => {",
+                  "    const yo = Number(pm.collectionVariables.get('id_admin'));",
+                  "    r.datos.forEach((l) => pm.expect(l.id_usuario).to.eql(yo));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria con rango de fechas → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?desde=2020-01-01&hasta=2099-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2020-01-01"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2099-12-31"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria con rango que no incluye nada → 200 vacío",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?desde=1900-01-01&hasta=1900-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "1900-01-01"
+                },
+                {
+                  "key": "hasta",
+                  "value": "1900-12-31"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Sin resultados', () => pm.expect(r.datos.length).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria?entidad=sedes (plural) → 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?entidad=sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "entidad",
+                  "value": "sedes"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 400);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "// Se valida contra la lista de entidades para que un plural devuelva",
+                  "// un 400 que lo explica, en vez de un listado vacío desconcertante.",
+                  "pm.test('Enumera las entidades válidas',",
+                  "    () => pm.expect(r.estado).to.include('sede'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria con rango invertido → 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?desde=2026-12-31&hasta=2026-01-01",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2026-01-01"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 400);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria con fecha inexistente → 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?desde=2026-02-30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-02-30"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 400);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Auditoría automática (criterio central)",
+      "item": [
+        {
+          "name": "POST /sedes → se audita sola como ALTA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sedes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Auditada {{sufijo}}\",\n  \"direccion\": \"Calle Falsa 123\",\n  \"telefono\": \"3424000099\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Nombre único por corrida, para poder identificar la entrada",
+                  "// que genera justo esta ejecución.",
+                  "pm.collectionVariables.set('sufijo', Date.now() % 100000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 201);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.collectionVariables.set('id_sede_test', r.datos.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria → apareció el ALTA",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?entidad=sede",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "entidad",
+                  "value": "sede"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "// CRITERIO DE ACEPTACIÓN: el alta quedó registrada AUTOMÁTICAMENTE.",
+                  "// No hay una sola línea de código de auditoría en sede.controller.ts",
+                  "// ni en sede.service.ts: lo hace el middleware.",
+                  "const id = Number(pm.collectionVariables.get('id_sede_test'));",
+                  "const alta = r.datos.find((l) => l.accion === 'ALTA' && l.id_entidad === id);",
+                  "pm.test('Existe el ALTA de la sede recién creada',",
+                  "    () => pm.expect(alta).to.not.be.undefined);",
+                  "pm.test('Registra quién la hizo', () => {",
+                  "    pm.expect(alta.id_usuario).to.eql(Number(pm.collectionVariables.get('id_admin')));",
+                  "});",
+                  "pm.test('El detalle identifica a la sede',",
+                  "    () => pm.expect(alta.detalle).to.include('Auditada'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /sedes/:id → se audita como MODIFICACION",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sedes/{{id_sede_test}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sedes",
+                "{{id_sede_test}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Auditada {{sufijo}} v2\",\n  \"direccion\": \"Calle Falsa 456\",\n  \"telefono\": \"3424000099\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria → apareció la MODIFICACION",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?entidad=sede",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "entidad",
+                  "value": "sede"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "const id = Number(pm.collectionVariables.get('id_sede_test'));",
+                  "const mod = r.datos.find((l) => l.accion === 'MODIFICACION' && l.id_entidad === id);",
+                  "pm.test('Existe la MODIFICACION',",
+                  "    () => pm.expect(mod).to.not.be.undefined);",
+                  "pm.test('El detalle trae el nombre nuevo',",
+                  "    () => pm.expect(mod.detalle).to.include('v2'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /sedes (lectura) → NO debe auditarse",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sedes"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria → la lectura no dejó rastro",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?entidad=sede",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "entidad",
+                  "value": "sede"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "// Las lecturas no modifican nada, así que no se auditan. Si se",
+                  "// auditaran, el log (que tiene 127 lugares) se llenaría enseguida.",
+                  "const id = Number(pm.collectionVariables.get('id_sede_test'));",
+                  "const deEstaSede = r.datos.filter((l) => l.id_entidad === id);",
+                  "pm.test('Sigue habiendo exactamente 2 entradas: ALTA y MODIFICACION',",
+                  "    () => pm.expect(deEstaSede.length).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /sedes/:id → se audita como BAJA",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sedes/{{id_sede_test}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sedes",
+                "{{id_sede_test}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria → apareció la BAJA",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?entidad=sede",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "entidad",
+                  "value": "sede"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "const id = Number(pm.collectionVariables.get('id_sede_test'));",
+                  "const baja = r.datos.find((l) => l.accion === 'BAJA' && l.id_entidad === id);",
+                  "pm.test('Existe la BAJA', () => pm.expect(baja).to.not.be.undefined);",
+                  "pm.test('El detalle cae al id, que es lo único que se sabe en un DELETE',",
+                  "    () => pm.expect(baja.detalle).to.include(String(id)));",
+                  "pm.test('Las tres acciones quedaron registradas', () => {",
+                  "    const acciones = r.datos.filter((l) => l.id_entidad === id)",
+                  "                            .map((l) => l.accion).sort();",
+                  "    pm.expect(acciones).to.eql(['ALTA', 'BAJA', 'MODIFICACION']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /sedes que falla (400) → NO debe auditarse",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sedes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 400);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria → el intento fallido no dejó rastro",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?entidad=sede",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "entidad",
+                  "value": "sede"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "// Solo se auditan las operaciones que salieron bien: un 400 no cambió",
+                  "// nada en la base, así que no hay nada que registrar.",
+                  "const id = Number(pm.collectionVariables.get('id_sede_test'));",
+                  "const deEstaSede = r.datos.filter((l) => l.id_entidad === id);",
+                  "pm.test('Siguen siendo 3 entradas',",
+                  "    () => pm.expect(deEstaSede.length).to.eql(3));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Reportes y estadísticas",
+      "item": [
+        {
+          "name": "GET /reportes/turnos-por-especialidad como paciente → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_paciente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/turnos-por-especialidad",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "turnos-por-especialidad"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 403);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes/turnos-por-sede como operador → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_operador}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/turnos-por-sede",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "turnos-por-sede"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 403);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes/ranking-medicos como médico → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_medico}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/ranking-medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "ranking-medicos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 403);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes/tasa-cancelacion sin token → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/tasa-cancelacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "tasa-cancelacion"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 401);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes/turnos-por-especialidad como admin → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/turnos-por-especialidad",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "turnos-por-especialidad"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Devuelve un array', () => pm.expect(r.datos).to.be.an('array'));",
+                  "pm.test('Cada fila trae id, nombre y cantidad', () => {",
+                  "    if (r.datos.length === 0) return;",
+                  "    pm.expect(r.datos[0]).to.have.property('id');",
+                  "    pm.expect(r.datos[0]).to.have.property('nombre');",
+                  "    pm.expect(r.datos[0]).to.have.property('cantidad');",
+                  "});",
+                  "pm.test('Ordenado de mayor a menor', () => {",
+                  "    for (let i = 1; i < r.datos.length; i++) {",
+                  "        pm.expect(r.datos[i - 1].cantidad >= r.datos[i].cantidad).to.be.true;",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes/turnos-por-sede como admin → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/turnos-por-sede",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "turnos-por-sede"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Incluye las sedes sin turnos, con cantidad 0', () => {",
+                  "    // LEFT JOIN desde sede: una sede sin movimiento se ve con 0 en",
+                  "    // vez de desaparecer del reporte.",
+                  "    pm.expect(r.datos.length).to.be.at.least(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes/ranking-medicos como admin → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/ranking-medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "ranking-medicos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "// La consigna aclara 'no solo el primero': se devuelve la lista entera.",
+                  "pm.test('Devuelve más de un médico',",
+                  "    () => pm.expect(r.datos.length).to.be.at.least(2));",
+                  "pm.test('Cada fila trae id_medico, medico y atendidos', () => {",
+                  "    pm.expect(r.datos[0]).to.have.property('id_medico');",
+                  "    pm.expect(r.datos[0]).to.have.property('medico');",
+                  "    pm.expect(r.datos[0]).to.have.property('atendidos');",
+                  "});",
+                  "pm.test('Ordenado de mayor a menor', () => {",
+                  "    for (let i = 1; i < r.datos.length; i++) {",
+                  "        pm.expect(r.datos[i - 1].atendidos >= r.datos[i].atendidos).to.be.true;",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes/tasa-cancelacion como admin → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/tasa-cancelacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "tasa-cancelacion"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Trae total, cancelados y tasa', () => {",
+                  "    pm.expect(r.datos).to.have.property('total');",
+                  "    pm.expect(r.datos).to.have.property('cancelados');",
+                  "    pm.expect(r.datos).to.have.property('tasa');",
+                  "});",
+                  "pm.test('La tasa es coherente con los conteos', () => {",
+                  "    const esperada = r.datos.total === 0",
+                  "        ? 0",
+                  "        : Number((r.datos.cancelados / r.datos.total).toFixed(2));",
+                  "    pm.expect(r.datos.tasa).to.eql(esperada);",
+                  "});",
+                  "pm.test('La tasa está entre 0 y 1', () => {",
+                  "    pm.expect(r.datos.tasa).to.be.at.least(0);",
+                  "    pm.expect(r.datos.tasa).to.be.at.most(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes/tasa-cancelacion en un período sin turnos → tasa 0",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/tasa-cancelacion?desde=1900-01-01&hasta=1900-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "tasa-cancelacion"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "1900-01-01"
+                },
+                {
+                  "key": "hasta",
+                  "value": "1900-12-31"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "// Sin turnos sería una división por cero. Se devuelve 0, no null:",
+                  "// no se canceló nada.",
+                  "pm.test('Total 0', () => pm.expect(r.datos.total).to.eql(0));",
+                  "pm.test('Tasa 0, no null', () => pm.expect(r.datos.tasa).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes con rango invertido → 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/turnos-por-sede?desde=2026-12-31&hasta=2026-01-01",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "turnos-por-sede"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "hasta",
+                  "value": "2026-01-01"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 400);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Lo explica',",
+                  "    () => pm.expect(r.estado).to.include('posterior'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /reportes con fecha inexistente → 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/ranking-medicos?hasta=2026-02-30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "ranking-medicos"
+              ],
+              "query": [
+                {
+                  "key": "hasta",
+                  "value": "2026-02-30"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 400);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Consistencia: los turnos mueven los reportes",
+      "item": [
+        {
+          "name": "Preparación: agenda en una fecha nueva",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_operador}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agendas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hora_entrada\": \"08:00\",\n  \"hora_salida\": \"12:00\",\n  \"fecha\": \"{{fecha_test}}\",\n  \"id_medico\": \"{{id_medico}}\",\n  \"id_especialidad\": 1,\n  \"id_sede\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Fecha exclusiva de esta corrida: los reportes se consultan",
+                  "// filtrados por ella, así los conteos son deterministas.",
+                  "const base = new Date();",
+                  "base.setDate(base.getDate() + 30 + (Date.now() % 900));",
+                  "pm.collectionVariables.set('fecha_test', base.toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 201);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.collectionVariables.set('id_agenda_test', r.datos.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Antes de cargar turnos: la fecha no tiene ninguno",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/tasa-cancelacion?desde={{fecha_test}}&hasta={{fecha_test}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "tasa-cancelacion"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "{{fecha_test}}"
+                },
+                {
+                  "key": "hasta",
+                  "value": "{{fecha_test}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Total 0', () => pm.expect(r.datos.total).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Turno A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_paciente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_especialidad\": 1,\n  \"id_sede\": 1,\n  \"id_medico\": \"{{id_medico}}\",\n  \"fecha\": \"{{fecha_test}}\",\n  \"hora\": \"08:30\",\n  \"nota\": \"Turno A\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 201);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.collectionVariables.set('id_turno_a', r.datos.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Turno B",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_paciente}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_especialidad\": 1,\n  \"id_sede\": 1,\n  \"id_medico\": \"{{id_medico}}\",\n  \"fecha\": \"{{fecha_test}}\",\n  \"hora\": \"09:00\",\n  \"nota\": \"Turno B\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 201);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.collectionVariables.set('id_turno_b', r.datos.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Con 2 turnos confirmados: total 2, tasa 0",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/tasa-cancelacion?desde={{fecha_test}}&hasta={{fecha_test}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "tasa-cancelacion"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "{{fecha_test}}"
+                },
+                {
+                  "key": "hasta",
+                  "value": "{{fecha_test}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "pm.test('Total 2', () => pm.expect(r.datos.total).to.eql(2));",
+                  "pm.test('Ninguno cancelado', () => pm.expect(r.datos.cancelados).to.eql(0));",
+                  "pm.test('Tasa 0', () => pm.expect(r.datos.tasa).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Los turnos aparecen en el reporte por especialidad",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/turnos-por-especialidad?desde={{fecha_test}}&hasta={{fecha_test}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "turnos-por-especialidad"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "{{fecha_test}}"
+                },
+                {
+                  "key": "hasta",
+                  "value": "{{fecha_test}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "const trauma = r.datos.find((e) => e.id === 1);",
+                  "pm.test('La especialidad usada cuenta 2',",
+                  "    () => pm.expect(trauma.cantidad).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Y en el reporte por sede",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/turnos-por-sede?desde={{fecha_test}}&hasta={{fecha_test}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "turnos-por-sede"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "{{fecha_test}}"
+                },
+                {
+                  "key": "hasta",
+                  "value": "{{fecha_test}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "const centro = r.datos.find((s) => s.id === 1);",
+                  "pm.test('La sede usada cuenta 2',",
+                  "    () => pm.expect(centro.cantidad).to.eql(2));",
+                  "const norte = r.datos.find((s) => s.id === 2);",
+                  "pm.test('La otra sede cuenta 0 y no desaparece',",
+                  "    () => pm.expect(norte.cantidad).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CANCELAR el turno A",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_paciente}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos/{{id_turno_a}}/cancelar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos",
+                "{{id_turno_a}}",
+                "cancelar"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "La tasa de cancelación se movió sola",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/tasa-cancelacion?desde={{fecha_test}}&hasta={{fecha_test}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "tasa-cancelacion"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "{{fecha_test}}"
+                },
+                {
+                  "key": "hasta",
+                  "value": "{{fecha_test}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "// CRITERIO DE CIERRE: 'que la cancelación de un turno actualice",
+                  "// correctamente los reportes'. Los reportes se calculan en el",
+                  "// momento, así que no hay ningún paso intermedio que ejecutar.",
+                  "pm.test('El total no cambia: la fila sigue existiendo',",
+                  "    () => pm.expect(r.datos.total).to.eql(2));",
+                  "pm.test('Ahora hay 1 cancelado',",
+                  "    () => pm.expect(r.datos.cancelados).to.eql(1));",
+                  "pm.test('La tasa pasó de 0 a 0.5',",
+                  "    () => pm.expect(r.datos.tasa).to.eql(0.5));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Antes de atender: el médico no tiene atendidos en esta fecha",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/ranking-medicos?desde={{fecha_test}}&hasta={{fecha_test}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "ranking-medicos"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "{{fecha_test}}"
+                },
+                {
+                  "key": "hasta",
+                  "value": "{{fecha_test}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "const yo = Number(pm.collectionVariables.get('id_medico'));",
+                  "const medico = r.datos.find((m) => m.id_medico === yo);",
+                  "pm.test('0 atendidos', () => pm.expect(medico.atendidos).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ATENDER el turno B",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_medico}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos/{{id_turno_b}}/atender",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos",
+                "{{id_turno_b}}",
+                "atender"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El ranking de médicos se movió solo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reportes/ranking-medicos?desde={{fecha_test}}&hasta={{fecha_test}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reportes",
+                "ranking-medicos"
+              ],
+              "query": [
+                {
+                  "key": "desde",
+                  "value": "{{fecha_test}}"
+                },
+                {
+                  "key": "hasta",
+                  "value": "{{fecha_test}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "const yo = Number(pm.collectionVariables.get('id_medico'));",
+                  "const medico = r.datos.find((m) => m.id_medico === yo);",
+                  "pm.test('Ahora tiene 1 atendido',",
+                  "    () => pm.expect(medico.atendidos).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Y las tres operaciones quedaron auditadas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?entidad=turno",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "entidad",
+                  "value": "turno"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Formato uniforme', () => {",
+                  "    pm.expect(r).to.have.property('codigo', 200);",
+                  "    pm.expect(r).to.have.property('estado');",
+                  "    pm.expect(r).to.have.property('datos');",
+                  "});",
+                  "const a = Number(pm.collectionVariables.get('id_turno_a'));",
+                  "const b = Number(pm.collectionVariables.get('id_turno_b'));",
+                  "pm.test('El alta del turno A quedó registrada', () => {",
+                  "    pm.expect(r.datos.some((l) => l.id_entidad === a && l.accion === 'ALTA'))",
+                  "      .to.be.true;",
+                  "});",
+                  "pm.test('La cancelación quedó como BAJA', () => {",
+                  "    pm.expect(r.datos.some((l) => l.id_entidad === a && l.accion === 'BAJA'))",
+                  "      .to.be.true;",
+                  "});",
+                  "pm.test('La atención quedó como MODIFICACION', () => {",
+                  "    pm.expect(r.datos.some((l) => l.id_entidad === b && l.accion === 'MODIFICACION'))",
+                  "      .to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
