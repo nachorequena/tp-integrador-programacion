@@ -11,8 +11,8 @@
 - **Materia:** Programación 2 — Proyecto integrador final de la carrera.
 - **Qué es:** aplicación web para digitalizar la gestión de una clínica médica: usuarios, agenda médica y turnos de pacientes.
 - **Dos etapas de 4 semanas cada una:**
-  1. **Backend** (semanas 1–4): Node.js + Express + MySQL/MariaDB. **← estamos acá.**
-  2. **Frontend** (semanas 5–8): Angular 21 + Angular Material, consumiendo esta API. **Fuera de alcance por ahora.**
+  1. **Backend** (semanas 1–4): Node.js + Express + MySQL/MariaDB. ✅ **Terminado.**
+  2. **Frontend** (semanas 5–8): Angular 21 + Angular Material, consumiendo esta API. **← estamos acá.** A la espera de la consigna de la semana 5.
 - Las consignas se liberan **semana a semana**. Cada entrega se construye sobre la anterior.
 
 ### Documentos de referencia (leer antes de codear)
@@ -20,11 +20,15 @@
 Las fuentes originales están en la carpeta `docs/` del repo. Ante cualquier duda sobre nombres, campos o alcance, **la fuente manda sobre lo que esté acá resumido**:
 
 - `docs/Enunciado-General.docx.pdf` — reglas generales del TP (formato de respuesta, entregas, evaluación).
-- `docs/Backend-semana-1.pdf` — consigna de la semana 1 (entregada).
-- `docs/Backend-semana-2.pdf` — **consigna de la semana en curso.**
+- `docs/Backend-semana-1.pdf` — consigna de la semana 1. ✅ entregada.
+- `docs/Backend-semana-2.pdf` — consigna de la semana 2. ✅ entregada.
+- `docs/Backend-semana 3.pdf` — consigna de la semana 3. ✅ entregada.
+- `docs/Backend-semana 4.pdf` — consigna de la semana 4. ✅ entregada.
 - `docs/clinica_ampliada.sql` — **script de la base. Es la fuente de verdad de los nombres exactos de tablas y columnas.** No inventes nombres: leé este archivo.
 
-> Cuando salga la consigna de la semana siguiente, se agrega su PDF a `docs/` y se actualiza la sección de alcance vigente (9) y la bitácora (14).
+> ⚠️ Ojo al citar los archivos: los PDF de las semanas 1 y 2 usan guion (`Backend-semana-1.pdf`) y los de la 3 y 4 usan espacio (`Backend-semana 3.pdf`). Así llegaron; no se renombraron para no romper enlaces ya entregados.
+
+> Cuando salga la consigna de una semana nueva, se agrega su PDF a `docs/` y se actualizan el alcance vigente (secciones 2 y 9) y la bitácora (14).
 
 ---
 
@@ -47,9 +51,12 @@ Las fuentes originales están en la carpeta `docs/` del repo. Ante cualquier dud
 
 ### Primer prompt sugerido para Claude Code
 
-> "Leé el `CLAUDE.md` completo y los PDFs de `docs/` antes de empezar. Confirmame el plan de la semana 1 (estructura de carpetas, endpoints y orden de trabajo) y **esperá mi ok antes de escribir código**."
+> "Leé el `CLAUDE.md` completo y el PDF de la semana en `docs/` antes de empezar. Confirmame el plan (estructura, endpoints o pantallas, y orden de trabajo) y **esperá mi ok antes de escribir código**."
 
 Esto fuerza a cargar el contexto y da un punto de control antes de generar nada, alineado con la regla de no adelantarse.
+
+Para trabajar sobre el backend ya entregado, además conviene levantarlo y mirar
+`GET /docs`: es más rápido que reconstruir la API leyendo el código.
 
 ---
 
@@ -57,14 +64,15 @@ Esto fuerza a cargar el contexto y da un punto de control antes de generar nada,
 
 El enunciado es explícito: cada entrega debe enfocarse **solo en lo que toca esa semana**, sin adelantarse.
 
-- **No** implementes tablas, endpoints ni lógica de semanas futuras aunque la base de datos ya las tenga.
-- La base `clinica_ampliada.sql` incluye 10 tablas. Acumulado hasta la semana 2 se usan **`usuario`, `sede`, `cobertura`, `especialidad`, `medico_especialidad` y `agenda`**.
-- **`turno` es semana 3+**: la única interacción permitida hoy es un `SELECT` de existencia para validar dependencias antes de un `DELETE` (sin esa lectura, el borrado revienta con un error de FK → 500, que el criterio de aceptación prohíbe). Nada de CRUD de turnos.
-- `historial_clinico`, `log_auditoria` y `notificacion` no se tocan.
+- **No** implementes endpoints ni lógica de semanas futuras aunque la base ya tenga las tablas.
 - Si tenés que crear estructura de carpetas o abstracciones "para después", hacelo solo si **no agrega complejidad hoy**.
 - Ante la duda de si algo pertenece a esta semana: **preguntá antes de codear**.
 
-**Alcance vigente:** Semana 2 (CRUD de sedes, especialidades, coberturas y agenda). Ver sección 9.
+**Alcance vigente:** 🏁 **El backend está cerrado.** Las cuatro semanas están entregadas y las 10 tablas de `clinica_ampliada.sql` están en uso. Ver el detalle en la sección 9.
+
+Lo que sigue es la **etapa 2: frontend con Angular 21 + Angular Material (semanas 5–8)**, consumiendo esta API. Cuando salga esa consigna, la regla de oro se aplica igual: solo lo que pide la semana.
+
+> **Sobre el backend ya entregado:** no se rehace ni se "mejora" por iniciativa propia. Cada rama `entrega-backend-N` es lo que evalúa el docente y tiene que quedar como está. Si el frontend necesita algo que la API no da, **preguntá antes de tocar el backend**: puede ser una mejora legítima o puede romper una entrega ya corregida.
 
 ---
 
@@ -85,8 +93,10 @@ Columna "Origen": **enunciado** = impuesto por la cátedra, no se negocia. **gru
 | Package manager | **npm** (el enunciado pide literal `npm run dev`)                 | enunciado |
 | Doc de API      | Postman                                                           | enunciado |
 
-**Dependencias base:** `express`, `mysql2`, `bcrypt`, `jsonwebtoken`, `dotenv`
-**Dev:** `typescript`, `tsx`, `@types/node`, `@types/express`, `@types/bcrypt`, `@types/jsonwebtoken`
+**Dependencias base:** `express`, `mysql2`, `bcrypt`, `jsonwebtoken`, `dotenv`, `swagger-ui-express`
+**Dev:** `typescript`, `tsx`, `@types/node`, `@types/express`, `@types/bcrypt`, `@types/jsonwebtoken`, `@types/swagger-ui-express`
+
+> `swagger-ui-express` se sumó en la semana 4, autorizado por el humano: la consigna pide elegir entre Postman y Swagger para documentar la API, y se eligió Swagger. La spec OpenAPI se escribe a mano en `src/docs/openapi.ts` como objeto TypeScript, así no hace falta una dependencia extra para parsear YAML.
 
 > **No agregues ninguna dependencia sin preguntar.** Si el build nativo de `bcrypt` falla en el entorno, avisá antes de cambiar a `bcryptjs`.
 
@@ -149,58 +159,76 @@ Ejemplo del nivel esperado:
 
 ## 5. Estructura de carpetas
 
+Un archivo por responsabilidad, con el mismo esqueleto en las cuatro semanas:
+**ruta → controller → validator → service → base**. El sufijo dice el rol del
+archivo, así que agregar una entidad es agregar los cinco archivos homónimos.
+
 ```
 src/
 ├── config/
-│   └── env.ts             # carga y valida variables de entorno
-├── database/              # nombre literal que pide la consigna
-│   └── conexion.ts        # pool de conexión mysql2
-├── controllers/           # reciben req/res, delegan en services
-│   ├── auth.controller.ts
-│   ├── agenda.controller.ts
-│   ├── cobertura.controller.ts
-│   ├── especialidad.controller.ts
-│   ├── sede.controller.ts
-│   └── health.controller.ts
-├── services/              # lógica de negocio + acceso a datos (SQL)
-│   ├── auth.service.ts
-│   ├── usuario.service.ts
-│   ├── agenda.service.ts
-│   ├── cobertura.service.ts
-│   ├── especialidad.service.ts
-│   ├── sede.service.ts
-│   └── dependencias.service.ts  # chequeo de FKs antes de un DELETE
+│   └── env.ts                    # carga y valida variables de entorno
+├── database/                     # nombre literal que pide la consigna
+│   └── conexion.ts               # pool de conexión mysql2
+├── docs/
+│   └── openapi.ts                # spec OpenAPI 3 de los 37 endpoints (semana 4)
+├── controllers/                  # reciben req/res, delegan en services
+│   ├── health.controller.ts      · auth.controller.ts
+│   ├── sede.controller.ts        · especialidad.controller.ts
+│   ├── cobertura.controller.ts   · agenda.controller.ts
+│   ├── turno.controller.ts       · historial.controller.ts
+│   ├── notificacion.controller.ts
+│   ├── auditoria.controller.ts   · reporte.controller.ts
+├── services/                     # lógica de negocio + acceso a datos (SQL)
+│   ├── auth.service.ts           · usuario.service.ts
+│   ├── sede.service.ts           · especialidad.service.ts
+│   ├── cobertura.service.ts      · agenda.service.ts
+│   ├── turno.service.ts          · historial.service.ts
+│   ├── notificacion.service.ts
+│   ├── auditoria.service.ts      · reporte.service.ts
+│   └── dependencias.service.ts   # chequeo de FKs antes de un DELETE
 ├── middlewares/
-│   ├── verificarToken.ts
-│   ├── verificarRol.ts
-│   └── manejadorErrores.ts
+│   ├── verificarToken.ts         # 401 si el JWT falta o es inválido
+│   ├── verificarRol.ts           # 403 si el rol no está permitido
+│   ├── auditoria.ts              # registra las acciones sensibles (semana 4)
+│   └── manejadorErrores.ts       # captura final, formato uniforme
 ├── routes/
-│   ├── index.ts           # monta todas las rutas
-│   ├── auth.routes.ts
-│   ├── agenda.routes.ts
-│   ├── cobertura.routes.ts
-│   ├── especialidad.routes.ts
-│   ├── sede.routes.ts
-│   └── health.routes.ts
+│   ├── index.ts                  # monta todas las rutas
+│   ├── health.routes.ts          · auth.routes.ts
+│   ├── sede.routes.ts            · especialidad.routes.ts
+│   ├── cobertura.routes.ts       · agenda.routes.ts
+│   ├── turno.routes.ts           · historial.routes.ts
+│   ├── notificacion.routes.ts
+│   ├── auditoria.routes.ts       · reporte.routes.ts
 ├── utils/
-│   ├── respuesta.ts       # helper de respuesta uniforme
-│   ├── errorHttp.ts       # error de negocio con código HTTP
-│   └── jwt.ts             # firmar/verificar tokens
+│   ├── respuesta.ts              # helper de respuesta uniforme
+│   ├── errorHttp.ts              # error de negocio con código HTTP
+│   └── jwt.ts                    # firmar/verificar tokens
 ├── validators/
-│   ├── comunes.ts         # helpers compartidos (texto, fecha, hora, ids)
-│   ├── auth.validators.ts
-│   ├── agenda.validators.ts
-│   └── entidades.validators.ts  # sede, especialidad y cobertura
+│   ├── comunes.ts                # helpers compartidos (texto, fecha, hora, ids)
+│   ├── auth.validators.ts        · entidades.validators.ts
+│   ├── agenda.validators.ts      · turno.validators.ts
+│   ├── historial.validators.ts
+│   ├── auditoria.validators.ts   · reporte.validators.ts
 ├── types/
-│   ├── index.ts
-│   └── express.d.ts       # agrega req.usuario al Request de Express
-└── index.ts               # arranque de Express
+│   ├── index.ts                  # interfaces de todas las entidades
+│   └── express.d.ts              # agrega req.usuario al Request de Express
+└── index.ts                      # arranque de Express y orden de middlewares
 
+postman/                          # una colección de pruebas por semana
 scripts/
-└── usuarios-prueba.sql    # contraseñas reales + 2do médico (ver sección 9)
+└── usuarios-prueba.sql           # contraseñas reales + 2do médico
+docs/                             # consignas en PDF + script de la base
 ```
 
 > La consigna pide textualmente `src/controllers`, `src/routes` y `src/database` ("o similar"). Se usan los tres con el nombre literal: cuesta cero y elimina cualquier objeción en la corrección.
+
+**Orden de middlewares en `src/index.ts`** (importa, Express los recorre de arriba hacia abajo):
+
+```
+express.json() → /docs → auditar → rutas → 404 → manejadorErrores
+```
+
+`auditar` va antes de las rutas porque envuelve `res.json`, y el 404 y el manejador de errores van últimos porque son la red de contención.
 
 ---
 
@@ -250,15 +278,16 @@ Consistencia total en todos los endpoints y todas las semanas. Esto se evalúa.
 
 ### ⚠️ Gotchas conocidos del script (tenerlos presentes)
 
-1. **🚨 `telefono` es `NOT NULL` y NO tiene default.** La consigna no lo lista entre los datos del registro, pero **un `INSERT` sin `telefono` falla** con `Error 1364: Field 'telefono' doesn't have a default value` (modo estricto, default en MySQL 5.7+). Decisión tomada: **`telefono` se pide en el registro como campo requerido** (es dato razonable para una clínica y evita tocar el `.sql`). Se valida `varchar(10)`. Si el docente objeta que no está en la consigna, la alternativa es insertar `''`.
+1. **🚨 `telefono` es `NOT NULL` y NO tiene default.** La consigna no lo lista entre los datos del registro, pero **un `INSERT` sin `telefono` falla** con `Error 1364: Field 'telefono' doesn't have a default value` **en un servidor en modo estricto** (el default de MySQL 5.7+). Ver el gotcha 8: el WAMP de desarrollo NO está en modo estricto, así que este error no se reproduce localmente pero sí puede aparecer en la máquina del docente. Decisión tomada: **`telefono` se pide en el registro como campo requerido** (es dato razonable para una clínica y evita tocar el `.sql`). Se valida `varchar(10)`. Si el docente objeta que no está en la consigna, la alternativa es insertar `''`.
 2. **Los hashes de contraseña del seed son FALSOS** (`'$2b$10$hashdeejemplo1'`). Ningún usuario cargado puede loguearse. Para probar login/roles:
    - Crear usuarios reales vía `POST /auth/registro` (quedan con rol `paciente`), **o**
    - Re-seedear con hashes bcrypt reales (esto sí requiere tocar datos; **preguntá antes**).
 3. **No hay `UNIQUE` en `dni` ni `email` a nivel base**, pero la consigna exige que no se dupliquen. → La unicidad se valida **en la app** con un `SELECT` previo al `INSERT`. No agregues índices únicos al script sin autorización.
 4. **Longitudes cortas — validarlas en la app antes de insertar:** `dni varchar(8)`, `email varchar(30)`, `telefono varchar(10)`, `nombre`/`apellido varchar(30)`, `rol varchar(20)`. `password varchar(255)` alcanza de sobra para un hash bcrypt (60 chars).
-5. PK/FK son `tinyint`: correcto para el alcance académico, no lo cambies. (Implica un techo de 127 usuarios; irrelevante para el TP.)
+5. **PK/FK son `tinyint` → techo de 127 filas por tabla.** No lo cambies. Para `usuario` es irrelevante, pero desde la semana 4 **sí importa en `log_auditoria`**: se audita cada alta, baja y modificación, y un ciclo completo de las cuatro colecciones de Postman consume ~20 entradas. Al llegar a 127 los INSERT fallan. Por eso la escritura del log es **no fatal** (avisa por consola y la operación de negocio termina bien igual). El SQL para vaciarlo está en el README. `agenda` y `turno` también acumulan, más lento.
 6. `fecha_nacimiento` es `date` → formato `YYYY-MM-DD`. Validar antes de insertar.
 7. Las tablas son `utf8` (utf8mb3) `utf8_general_ci`. Configurá `charset: "utf8mb4"` en el pool para que los acentos no se rompan (`Martín`, `García`).
+8. **⚠️ El WAMP local NO está en modo estricto** (`sql_mode = IGNORE_SPACE`), verificado en la semana 4. Consecuencias: pasarse del largo de una columna **trunca en silencio** en vez de dar el error 1406, y un `NOT NULL` sin default no siempre falla. **No confíes en la base para validar**: los largos se controlan en la app (ver los validators), porque la máquina del docente probablemente sí sea estricta y ahí lo que acá se trunca, allá revienta con un 500.
 
 ### Roles válidos (según el seed — no inventar otros)
 
@@ -294,9 +323,29 @@ JWT_EXPIRES_IN=1d
 
 ---
 
-## 9. Alcance de la SEMANA 2 (VIGENTE)
+## 9. Alcance del backend (COMPLETO ✅)
 
-> Entregable en la rama **`entrega-backend-2`** (lo pide textualmente la consigna).
+Las cuatro semanas están entregadas. Cada una vive en su propia rama —así la
+evalúa el docente— y `main` es el acumulado.
+
+| Semana | Rama | Contenido | Pruebas |
+| ------ | ---- | --------- | ------- |
+| 1 | `entrega-backend-1` (en `main`) | Setup, conexión, JWT y middlewares | 36/36 |
+| 2 | `entrega-backend-2` | CRUD de sedes, especialidades, coberturas y agenda | 86/86 |
+| 3 | `entrega-backend-3` | Turnos, historial clínico y notificaciones | 142/142 |
+| 4 | `entrega-backend-4` | Auditoría, reportes y documentación Swagger | 146/146 |
+
+**37 endpoints en total.** El listado completo, con método, ruta, rol y cuerpo
+esperado, está en dos lugares que sí conviene consultar antes que esta sección:
+
+- **`GET /docs`** — Swagger UI, la documentación viva de la API.
+- **`README.md`** — tablas de endpoints por semana, más las decisiones de diseño.
+
+Las 10 tablas de `clinica_ampliada.sql` están en uso.
+
+### 9.0 Semana 2 — ENTREGADA ✅ (referencia)
+
+> Entregada en la rama **`entrega-backend-2`** (lo pide textualmente la consigna).
 
 ### Endpoints a entregar
 
@@ -364,7 +413,7 @@ Todas responden **409** con un mensaje que indique qué la está usando.
 - **Sin solapamiento**: se rechaza con 409 si el rango pisa otro del mismo médico en la misma fecha (en el `PUT` se excluye la propia fila). Un médico no puede estar en dos lugares a la vez.
 - Varios rangos por día para el mismo médico están permitidos, siempre que no se solapen.
 
-### Criterios de aceptación (checklist de la semana 2)
+#### Criterios de aceptación de la semana 2 (cumplidos)
 
 - [ ] El proyecto levanta con `npm run dev` sin errores.
 - [ ] Sedes, especialidades y coberturas responden **403** a cualquier rol que no sea `admin`.
@@ -381,9 +430,9 @@ Todas responden **409** con un mensaje que indique qué la está usando.
 
 ---
 
-## 9.1 Semana 1 — ENTREGADA ✅ (referencia)
+### 9.1 Semana 1 — ENTREGADA ✅ (referencia)
 
-### Endpoints entregados
+#### Endpoints entregados
 
 | Método | Ruta             | Protección                                 | Descripción                                                               |
 | ------ | ---------------- | ------------------------------------------ | ------------------------------------------------------------------------- |
@@ -396,7 +445,7 @@ Todas responden **409** con un mensaje que indique qué la está usando.
 
 > Los últimos dos existen para cumplir "al menos un endpoint protegido por cada middleware". `/sedes` usa solo la tabla `sede` (dentro del alcance).
 
-### `POST /auth/registro`
+#### `POST /auth/registro`
 
 - Campos requeridos por la consigna: `nombre`, `apellido`, `dni`, `email`, `password`, `fecha_nacimiento`, `id_cobertura`.
 - **+ `telefono`**: no está en la consigna, pero la columna es `NOT NULL` sin default → sin él el `INSERT` explota. Ver gotcha 1 de la sección 7.
@@ -406,24 +455,24 @@ Todas responden **409** con un mensaje que indique qué la está usando.
 - Validar que `dni` y `email` **no estén duplicados** → responder 409 con mensaje claro si lo están.
 - `id_sede` va `null` para pacientes.
 
-### `POST /auth/login`
+#### `POST /auth/login`
 
 - Recibe `dni` y `password`.
 - Busca el usuario por `dni`, compara con `bcrypt.compare`.
 - Si es correcto → devuelve JWT con `id`, `rol`, `id_sede`.
 - Si falla → 401 con mensaje genérico (no revelar si el error es el dni o la contraseña).
 
-### `GET /auth/perfil`
+#### `GET /auth/perfil`
 
 - Protegido por `verificarToken`.
 - Devuelve los datos del usuario logueado tomando el `id` del token (sin la `password`).
 
-### Middlewares
+#### Middlewares
 
 - **`verificarToken`**: valida que el JWT sea válido y no esté vencido. Si no → **401**. Inyecta el payload en `req` (p. ej. `req.usuario`).
 - **`verificarRol(...rolesPermitidos)`**: verifica que `req.usuario.rol` esté entre los permitidos. Si no → **403**. Se usa siempre después de `verificarToken`.
 
-### ⚠️ Cómo probar el caso 200 de `verificarRol`
+#### ⚠️ Cómo probar el caso 200 de `verificarRol`
 
 Los usuarios del seed **no pueden loguearse** (hashes falsos) y el registro público siempre crea `paciente`. Entonces:
 
@@ -437,7 +486,7 @@ Opciones (elegir **con el humano antes de ejecutar**, ninguna se hace por inicia
 
 En cualquier caso: dejar documentadas las credenciales de prueba en el README (el enunciado exige llevar "credenciales de prueba" a la defensa).
 
-### Criterios de aceptación (checklist de la semana)
+#### Criterios de aceptación de la semana 1 (cumplidos)
 
 - [ ] El proyecto levanta con `npm run dev` sin errores.
 - [ ] Las contraseñas se guardan hasheadas en la base.
@@ -465,27 +514,29 @@ En cualquier caso: dejar documentadas las credenciales de prueba en el README (e
 
 ---
 
-## 12. Entregables de la semana 2
+## 12. Entregables (todos cumplidos ✅)
 
-1. Repositorio actualizado sobre la base de la semana 1, **en la rama `entrega-backend-2`**.
-2. CRUD de sedes, especialidades, coberturas y agenda médica, protegidos por rol.
-3. Colección de Postman de estos endpoints (exportada al repo, carpeta `postman/`).
+La entrega es el **link al repositorio** en el aula virtual, apuntando a la rama
+de esa semana.
 
-<details>
-<summary>Entregables de la semana 1 (cumplidos)</summary>
+| Semana | Rama | Entregado |
+| ------ | ---- | --------- |
+| 1 | `entrega-backend-1` (en `main`) | Backend inicializado; `/auth/registro`, `/auth/login` y `/auth/perfil` operativos; colección de Postman. |
+| 2 | `entrega-backend-2` | CRUD de sedes, especialidades, coberturas y agenda, protegidos por rol; colección de Postman. |
+| 3 | `entrega-backend-3` | Alta, cancelación y atención de turnos; historial clínico; notificaciones; colección de Postman. |
+| 4 | `entrega-backend-4` | Auditoría automática y su consulta; los cuatro reportes con rango de fechas; documentación Swagger en `/docs`; colección de Postman. |
 
-1. Repositorio con el backend inicializado y funcionando.
-2. Endpoints `POST /auth/registro`, `POST /auth/login`, `GET /auth/perfil` operativos.
-3. Colección de Postman con las pruebas de esos tres endpoints.
+Las cuatro colecciones están en `postman/`, una por semana.
 
-</details>
+> **Para la defensa:** hay que llevar credenciales de prueba (están en el
+> README) y conviene resetear `log_auditoria` antes, porque tiene tope de 127
+> filas. El SQL para vaciarlo está en el README.
 
 ---
 
 ## 13. Qué NO hacer (guardrails)
 
-- ❌ No implementar turnos, historial clínico, notificaciones ni auditoría (semanas futuras). **La agenda sí entra desde la semana 2.**
-- ❌ De `turno` solo se lee para validar dependencias antes de un `DELETE`. Nada de altas, bajas ni modificaciones de turnos.
+- ❌ No rehacer ni "mejorar" lo ya entregado por iniciativa propia. Las cuatro ramas `entrega-backend-N` son lo que evalúa el docente. Si algo hay que cambiar, **preguntá primero**.
 - ❌ No usar ORM. SQL crudo con `mysql2`.
 - ❌ No dejar contraseñas en texto plano en ningún lado.
 - ❌ No armar respuestas fuera del helper `responder`.

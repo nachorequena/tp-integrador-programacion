@@ -324,18 +324,35 @@ npx newman run postman/Clinica-Backend-Semana2.postman_collection.json
 src/
 ├── config/env.ts              # carga y valida las variables de entorno
 ├── database/conexion.ts       # pool de mysql2 + ping para /health
+├── docs/openapi.ts            # spec OpenAPI 3 que sirve /docs
 ├── controllers/               # reciben req/res y delegan en los services
 ├── services/                  # lógica de negocio + SQL parametrizado
 │   └── dependencias.service.ts  # chequeo de FKs antes de un DELETE
-├── middlewares/               # verificarToken, verificarRol, manejadorErrores
+├── middlewares/
+│   ├── verificarToken.ts        # 401 si el JWT falta o es inválido
+│   ├── verificarRol.ts          # 403 si el rol no está permitido
+│   ├── auditoria.ts             # registra solo las acciones sensibles
+│   └── manejadorErrores.ts      # captura final, formato uniforme
 ├── routes/                    # definición y montaje de rutas
 ├── validators/                # validación de los cuerpos de las peticiones
 │   └── comunes.ts               # helpers compartidos por todos
 ├── utils/                     # respuesta uniforme, JWT, ErrorHttp
 ├── types/                     # interfaces de las entidades
 └── index.ts                   # arranque de Express
+postman/                       # una colección de pruebas por semana
 scripts/
 └── usuarios-prueba.sql        # contraseñas reales para poder loguearse
+docs/                          # consignas en PDF + script de la base
 ```
+
+Cada entidad sigue el mismo esqueleto —**ruta → controller → validator → service → base**—, así que agregar una es agregar los archivos homónimos en esas cuatro carpetas.
+
+El orden de los middlewares en `index.ts` importa, porque Express los recorre de arriba hacia abajo:
+
+```
+express.json() → /docs → auditar → rutas → 404 → manejadorErrores
+```
+
+`auditar` va antes de las rutas porque envuelve `res.json`; el 404 y el manejador de errores van últimos porque son la red de contención.
 
 Convenciones: identificadores en español, replicando la nomenclatura de la base. Queries siempre parametrizadas con `?`. Controladores finos, lógica en los services. Todo el código documentado (ver `CLAUDE.md`, sección 4.1).
