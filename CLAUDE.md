@@ -93,10 +93,12 @@ Columna "Origen": **enunciado** = impuesto por la cátedra, no se negocia. **gru
 | Package manager | **npm** (el enunciado pide literal `npm run dev`)                 | enunciado |
 | Doc de API      | Postman                                                           | enunciado |
 
-**Dependencias base:** `express`, `mysql2`, `bcrypt`, `jsonwebtoken`, `dotenv`, `swagger-ui-express`
-**Dev:** `typescript`, `tsx`, `@types/node`, `@types/express`, `@types/bcrypt`, `@types/jsonwebtoken`, `@types/swagger-ui-express`
+**Dependencias base:** `express`, `mysql2`, `bcrypt`, `jsonwebtoken`, `dotenv`, `swagger-ui-express`, `cors`
+**Dev:** `typescript`, `tsx`, `@types/node`, `@types/express`, `@types/bcrypt`, `@types/jsonwebtoken`, `@types/swagger-ui-express`, `@types/cors`
 
 > `swagger-ui-express` se sumó en la semana 4, autorizado por el humano: la consigna pide elegir entre Postman y Swagger para documentar la API, y se eligió Swagger. La spec OpenAPI se escribe a mano en `src/docs/openapi.ts` como objeto TypeScript, así no hace falta una dependencia extra para parsear YAML.
+
+> `cors` se sumó al arrancar el frontend, autorizado por el humano: la consigna de la semana 5 pide el backend con CORS habilitado para `http://localhost:4200`. El origen es configurable con `CORS_ORIGEN`. El cambio va en `main`; las ramas `entrega-backend-N` no se tocaron.
 
 > **No agregues ninguna dependencia sin preguntar.** Si el build nativo de `bcrypt` falla en el entorno, avisá antes de cambiar a `bcryptjs`.
 
@@ -319,6 +321,7 @@ DB_PASSWORD=
 DB_NAME=clinica
 JWT_SECRET=cambiar_este_secreto
 JWT_EXPIRES_IN=1d
+CORS_ORIGEN=http://localhost:4200
 ```
 
 ---

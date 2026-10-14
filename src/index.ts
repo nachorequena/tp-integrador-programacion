@@ -8,17 +8,19 @@
  *
  * Recorrido de una petición:
  *
- *   1. `express.json()`  → si viene un body JSON, lo parsea y lo deja en req.body
- *   2. `/docs`           → documentación Swagger de la API (pública)
- *   3. `auditar`         → envuelve res.json para registrar acciones sensibles
- *   4. `rutas`           → busca una ruta que coincida (ver src/routes/index.ts)
- *   5. 404               → si ninguna coincidió, la petición cae acá
- *   6. `manejadorErrores`→ solo se ejecuta si algo llamó a next(error)
+ *   1. `cors()`          → agrega los encabezados CORS y responde los preflight
+ *   2. `express.json()`  → si viene un body JSON, lo parsea y lo deja en req.body
+ *   3. `/docs`           → documentación Swagger de la API (pública)
+ *   4. `auditar`         → envuelve res.json para registrar acciones sensibles
+ *   5. `rutas`           → busca una ruta que coincida (ver src/routes/index.ts)
+ *   6. 404               → si ninguna coincidió, la petición cae acá
+ *   7. `manejadorErrores`→ solo se ejecuta si algo llamó a next(error)
  *
- * Los pasos 5 y 6 van al final justamente porque son la red de contención:
+ * Los pasos 6 y 7 van al final justamente porque son la red de contención:
  * si estuvieran arriba, atraparían peticiones que sí tenían una ruta válida.
  */
 
+import cors from "cors";
 import express from "express";
 import swaggerUi from "swagger-ui-express";
 import { entorno } from "./config/env";
@@ -30,6 +32,19 @@ import { rutas } from "./routes";
 import { responder } from "./utils/respuesta";
 
 const app = express();
+
+/**
+ * CORS para el frontend Angular.
+ *
+ * El front corre en otro origen (`localhost:4200`) y el navegador bloquea las
+ * respuestas de un origen distinto salvo que el servidor las autorice. Va
+ * PRIMERO porque las peticiones con `Authorization` o JSON disparan un
+ * preflight `OPTIONS`: si llegara a las rutas, terminaría en el 404.
+ *
+ * Se autoriza un único origen y no `*`, para que ninguna otra página pueda
+ * consumir la API desde el navegador de un usuario.
+ */
+app.use(cors({ origin: entorno.corsOrigen }));
 
 // Middleware nativo de Express: convierte el cuerpo JSON de la petición en un
 // objeto JavaScript accesible desde `req.body`. Sin esto, `req.body` sería

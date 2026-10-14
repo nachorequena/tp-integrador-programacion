@@ -83,4 +83,12 @@ export const entorno = {
 
   /** Vencimiento del token en formato de la librería `ms` (ej: "1d", "2h"). */
   jwtExpiraEn: opcional("JWT_EXPIRES_IN", "1d"),
+
+  /**
+   * Origen autorizado a llamar a la API desde un navegador (CORS).
+   *
+   * Por defecto es el `ng serve` del frontend Angular. Se deja configurable
+   * porque si el front cambia de puerto o se despliega, el backend no se toca.
+   */
+  corsOrigen: opcional("CORS_ORIGEN", "http://localhost:4200"),
 };

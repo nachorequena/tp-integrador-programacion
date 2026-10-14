@@ -53,6 +53,7 @@ Completar `.env` con las credenciales reales:
 | `DB_NAME`        | Nombre de la base (`clinica`)                  |
 | `JWT_SECRET`     | Secreto para firmar los tokens                 |
 | `JWT_EXPIRES_IN` | Vencimiento del token (default `1d`)           |
+| `CORS_ORIGEN`    | Origen del frontend autorizado por CORS (default `http://localhost:4200`) |
 
 > `.env` está en `.gitignore` y **no se versiona**. El que sí se versiona es `.env.example`.
 
