@@ -12,7 +12,7 @@
 - **Qué es:** aplicación web para digitalizar la gestión de una clínica médica: usuarios, agenda médica y turnos de pacientes.
 - **Dos etapas de 4 semanas cada una:**
   1. **Backend** (semanas 1–4): Node.js + Express + MySQL/MariaDB. ✅ **Terminado.**
-  2. **Frontend** (semanas 5–8): Angular 21 + Angular Material, consumiendo esta API. **← estamos acá.** A la espera de la consigna de la semana 5.
+  2. **Frontend** (semanas 5–8): Angular 21 + Angular Material, consumiendo esta API. **← estamos acá.** Vive en un **repositorio aparte** (lo exige la consigna): https://github.com/nachorequena/tp-integrador-frontend, carpeta local hermana `../tp-integrador-frontend`, con su propio `CLAUDE.md` y su bitácora.
 - Las consignas se liberan **semana a semana**. Cada entrega se construye sobre la anterior.
 
 ### Documentos de referencia (leer antes de codear)
@@ -555,7 +555,11 @@ Las cuatro colecciones están en `postman/`, una por semana.
 > Mantené esta sección al día para conservar contexto entre sesiones de Claude Code.
 > Semanas más recientes arriba.
 
-**Semana en curso:** Semana 4 ✅ entregada. **Backend completo.** **Pendiente:** etapa 2, frontend con Angular (semanas 5-8).
+**Semana en curso:** Backend completo. El frontend avanza en su propio repositorio (https://github.com/nachorequena/tp-integrador-frontend); su bitácora está en el `CLAUDE.md` de ese repo.
+
+### Etapa 2 — cambios al backend pedidos por el frontend
+
+- **CORS habilitado** (paquete `cors`, autorizado por el humano). La consigna de la semana 1 del frontend pide el backend con CORS para `http://localhost:4200`. Un solo origen autorizado, configurable con `CORS_ORIGEN`. Va en `main`; las ramas `entrega-backend-N` no se tocaron.
 
 ### Semana 4 — Auditoría, reportes y cierre
 
