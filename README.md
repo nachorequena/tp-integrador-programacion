@@ -38,6 +38,13 @@ Con MySQL/MariaDB encendido, este comando ([scripts/iniciar.cjs](scripts/iniciar
 
 `npm run base:reiniciar` borra la base y la recrea desde cero, sin levantar la API.
 
+**Si preferís escribir el `.env` a mano**, el script no pregunta nada y usa tus valores:
+
+- Lo lee con `dotenv`, igual que el backend.
+- Si falta `DB_HOST`, `DB_USER`, `DB_NAME` o `JWT_SECRET`, lo avisa.
+- Para los valores que contengan `#` o espacios usá comillas (`DB_PASSWORD="mi#clave"`). Sin comillas, todo lo que sigue a un `#` se toma como comentario.
+- Revisá `DB_PORT`: en WAMP, MySQL suele estar en 3308.
+
 Los pasos manuales equivalentes son los siguientes.
 
 ### 1. Crear e importar la base
