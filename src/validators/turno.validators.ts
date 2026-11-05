@@ -53,9 +53,16 @@ const MAXIMO_NOTA = 40;
  * @throws `ErrorHttp` 400 con todos los errores encontrados, juntos.
  */
 export function validarNuevoTurno(cuerpo: unknown): DatosNuevoTurno {
+  // Si el cuerpo no es un objeto JSON (vacío, un número, null...), corta acá
+  // con un 400 "El cuerpo de la petición debe ser un objeto JSON".
   const datos = comoObjeto(cuerpo);
+  // Acá se van juntando TODOS los problemas que se encuentren. No se corta en
+  // el primero: así el cliente recibe la lista completa en un solo 400.
   const errores: string[] = [];
 
+  // Los tres ids: obligatorios y enteros positivos. `validarIdCuerpo` (en
+  // comunes.ts) agrega el mensaje a `errores` si falta o si es inválido
+  // ("id_medico es obligatorio" / "...debe ser un número entero positivo").
   const idEspecialidad = validarIdCuerpo(
     datos.id_especialidad,
     "id_especialidad",
@@ -64,6 +71,10 @@ export function validarNuevoTurno(cuerpo: unknown): DatosNuevoTurno {
   const idSede = validarIdCuerpo(datos.id_sede, "id_sede", errores);
   const idMedico = validarIdCuerpo(datos.id_medico, "id_medico", errores);
 
+  // FECHA: `textoLimpio` la pasa a texto sin espacios (o "" si no vino).
+  //   - si quedó vacía → falta;
+  //   - si no es "YYYY-MM-DD" o no existe (31 de febrero) → formato inválido.
+  // (Que sea futura y que el médico tenga agenda ese día lo controla el service.)
   const fecha = textoLimpio(datos.fecha);
   if (!fecha) errores.push("fecha es obligatoria");
   else if (!esFechaValida(fecha))
@@ -79,7 +90,9 @@ export function validarNuevoTurno(cuerpo: unknown): DatosNuevoTurno {
   else if (!esHoraValida(hora))
     errores.push("hora debe tener formato HH:MM (entre 00:00 y 23:59)");
 
-  // La consigna la marca explícitamente como obligatoria.
+  // NOTA: la consigna la marca explícitamente como obligatoria.
+  //   - vacía (o solo espacios: textoLimpio los saca) → falta;
+  //   - más de 40 caracteres → no entra en la columna varchar(40).
   const nota = textoLimpio(datos.nota);
   if (!nota) errores.push("nota es obligatoria");
   else if (nota.length > MAXIMO_NOTA)
@@ -87,13 +100,19 @@ export function validarNuevoTurno(cuerpo: unknown): DatosNuevoTurno {
 
   // Opcional acá porque solo lo manda el operador. Que sea obligatorio para
   // ese rol se decide en el controller, que es quien conoce quién pide.
+  // Solo se valida si vino algo.
   let idPaciente: number | undefined;
   if (datos.id_paciente !== undefined && datos.id_paciente !== null) {
     idPaciente = validarIdCuerpo(datos.id_paciente, "id_paciente", errores);
   }
 
+  // Si se juntó al menos un error, lanza UN ErrorHttp 400 con todos ellos
+  // separados por "; ". El controller no lo atrapa él mismo: el `catch` lo
+  // manda al manejador de errores, que responde el 400.
   lanzarSiHayErrores(errores);
 
+  // Llegar acá significa que todo es válido: se devuelven los datos ya
+  // limpios y con su tipo, listos para el service.
   return {
     id_especialidad: idEspecialidad,
     id_sede: idSede,
