@@ -79,12 +79,22 @@ export function esHorarioDeLaGrilla(
   rango: { hora_entrada: string; hora_salida: string },
   hora: string,
 ): boolean {
+  // Todo se pasa a minutos desde medianoche para poder sumar y restar:
+  // "08:00" → 480, "10:00" → 600.
   const inicio = aMinutos(rango.hora_entrada);
   const fin = aMinutos(rango.hora_salida);
   const pedido = aMinutos(hora);
+  // Las tres condiciones unidas con && (tienen que cumplirse TODAS).
+  // Ejemplo con rango 08:00–10:00:
   return (
+    // 1) no empieza antes de la entrada ("07:30" → false);
     pedido >= inicio &&
+    // 2) termina dentro del rango: "09:30" + 30 = 10:00 <= 10:00 → ok;
+    //    "10:00" + 30 = 10:30 > 10:00 → false;
     pedido + DURACION_TURNO <= fin &&
+    // 3) está en la grilla: los minutos desde la entrada son múltiplo de 30.
+    //    `%` es el resto de la división: "08:30" → 30 % 30 = 0 → ok;
+    //    "08:10" → 10 % 30 = 10 → false.
     (pedido - inicio) % DURACION_TURNO === 0
   );
 }
@@ -97,20 +107,32 @@ export function esHorarioDeLaGrilla(
  * @returns Los inicios de turno libres y futuros, en orden.
  */
 function horariosLibresDelRango(rango: RangoAgenda, horasOcupadas: string[]): HorarioLibre[] {
+  // Las horas ocupadas pasadas a minutos (["09:00"] → [540]).
   const ocupados = horasOcupadas.map(aMinutos);
+  // Acá se van agregando los horarios que quedan libres.
   const libres: HorarioLibre[] = [];
   const fin = aMinutos(rango.hora_salida);
 
+  // El for recorre la grilla de a 30 minutos:
+  //   - arranca en la hora de entrada;
+  //   - sigue mientras el turno entero entre antes de la salida;
+  //   - en cada vuelta suma 30 minutos.
+  // Rango 08:00–10:00 → vueltas en 08:00, 08:30, 09:00 y 09:30.
   for (
     let inicio = aMinutos(rango.hora_entrada);
     inicio + DURACION_TURNO <= fin;
     inicio += DURACION_TURNO
   ) {
+    // Vuelve a texto: 510 → "08:30".
     const hora = aHora(inicio);
-    // Un horario de hoy que ya pasó no se ofrece.
+    // Un horario de hoy que ya pasó no se ofrece. `continue` saltea el resto
+    // de esta vuelta y pasa a la siguiente.
     if (yaPaso(rango.fecha, hora)) continue;
     // Bloquea cualquier turno confirmado a menos de una duración de distancia.
+    // Es la MISMA cuenta que hace `crearTurno` antes de insertar, así lo que se
+    // ofrece coincide con lo que el alta acepta.
     const pisado = ocupados.some((ocupado) => Math.abs(ocupado - inicio) < DURACION_TURNO);
+    // Si nadie lo pisa, se agrega a la lista de libres.
     if (!pisado) libres.push({ hora, id_agenda: rango.id });
   }
   return libres;
@@ -128,6 +150,11 @@ async function rangosConOcupados(
   consulta: ConsultaDisponibilidad,
   fecha?: string,
 ): Promise<{ rango: RangoAgenda; ocupadas: string[] }[]> {
+  // CONSULTA 1 — rangos de agenda del médico en esa especialidad y sede.
+  // El filtro de fecha cambia según si vino `fecha` (operador ternario `? :`):
+  //   - con fecha  → "fecha = ?"  (pantalla de horarios: un día puntual);
+  //   - sin fecha  → "fecha >= ?" con hoy (pantalla de fechas: de hoy en adelante).
+  // `fecha ?? fechaHoy()` usa la fecha recibida o, si no vino, la de hoy.
   const [rangos] = await pool.query<RowDataPacket[]>(
     `SELECT id, fecha, hora_entrada, hora_salida
        FROM agenda
@@ -137,7 +164,12 @@ async function rangosConOcupados(
     [consulta.id_medico, consulta.id_especialidad, consulta.id_sede, fecha ?? fechaHoy()],
   );
 
+  // Sin rangos no hay nada que calcular: se devuelve una lista vacía (y se
+  // evita la segunda consulta, que con `IN ()` vacío sería SQL inválido).
   if (rangos.length === 0) return [];
+
+  // CONSULTA 2 — horas de los turnos confirmados de TODOS esos rangos juntos
+  // (`IN (?)` con el array de ids; mysql2 lo expande a "IN (3, 7, 9)").
 
   // Solo la hora: este servicio no devuelve NADA de los turnos ocupados (ni
   // paciente ni nota). La consigna pide no exponer datos de otros pacientes.
@@ -148,6 +180,9 @@ async function rangosConOcupados(
     [rangos.map((rango) => rango.id)],
   );
 
+  // Arma el resultado: por cada rango, sus datos (convertidos a número/texto)
+  // y la lista de horas ocupadas que le pertenecen (`filter` se queda con los
+  // turnos de ese id_agenda y `map` toma solo la hora).
   return rangos.map((fila) => ({
     rango: {
       id: Number(fila.id),
@@ -173,8 +208,12 @@ async function rangosConOcupados(
 export async function listarFechasDisponibles(
   consulta: ConsultaDisponibilidad,
 ): Promise<string[]> {
+  // Un Set no admite repetidos: si el médico tiene dos rangos el mismo día,
+  // la fecha queda una sola vez.
   const fechas = new Set<string>();
+  // Recorre cada rango (desde hoy) con sus horas ocupadas...
   for (const { rango, ocupadas } of await rangosConOcupados(consulta)) {
+    // ...y solo agrega la fecha si ese rango tiene al menos un horario libre.
     if (horariosLibresDelRango(rango, ocupadas).length > 0) fechas.add(rango.fecha);
   }
   // El Set conserva el orden de inserción, y los rangos ya vienen por fecha.
@@ -196,8 +235,12 @@ export async function listarHorariosDisponibles(
   fecha: string,
 ): Promise<HorarioLibre[]> {
   const horarios: HorarioLibre[] = [];
+  // Por cada rango de ESA fecha, se calculan sus libres y se agregan todos a
+  // la lista (`...` "desparrama" el array dentro de push).
   for (const { rango, ocupadas } of await rangosConOcupados(consulta, fecha)) {
     horarios.push(...horariosLibresDelRango(rango, ocupadas));
   }
+  // Ordena por hora ("08:00" antes que "14:00"): con dos dígitos, comparar
+  // texto da el orden cronológico. Es lo que muestra el paso "Horario".
   return horarios.sort((a, b) => a.hora.localeCompare(b.hora));
 }

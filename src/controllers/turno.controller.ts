@@ -56,31 +56,49 @@ function usuarioAutenticado(req: Request): PayloadJWT {
  * Responde 201 con el turno creado (detallado) y un mensaje.
  */
 export async function crear(
-  req: Request,
-  res: Response,
-  next: NextFunction,
+  req: Request, // el pedido: cuerpo JSON en req.body, usuario del token en req.usuario
+  res: Response, // con qué se responde (a través de `responder`)
+  next: NextFunction, // para pasarle un error al manejador de errores
 ): Promise<void> {
+  // Todo va dentro de un try/catch: CUALQUIER error que se lance adentro (del
+  // validador, de estas reglas o del service) cae en el `catch`, que lo pasa
+  // con `next(error)` al middleware `manejadorErrores`. Ese middleware arma la
+  // respuesta de error con el formato uniforme { codigo, estado, datos: null }.
   try {
+    // Quién hace el pedido (lo dejó verificarToken a partir del JWT).
     const usuario = usuarioAutenticado(req);
+    // Valida la FORMA del cuerpo (ids, fecha, hora, nota). Si algo está mal,
+    // lanza un ErrorHttp 400 con todos los errores juntos y salta al catch.
     const datos = validarNuevoTurno(req.body);
 
+    // ¿Para qué paciente es el turno?
     let idPaciente: number;
     if (usuario.rol === "paciente") {
+      // PACIENTE: para sí mismo. El id sale del TOKEN (firmado, no se puede
+      // falsificar), nunca del cuerpo: si se tomara del cuerpo, un paciente
+      // podría sacarle turnos a otro mandando otro id_paciente.
       idPaciente = usuario.id;
     } else {
+      // OPERADOR (el único otro rol que llega acá: lo filtró verificarRol).
+      // Regla 1: tiene que indicar para qué paciente es el turno.
       if (datos.id_paciente === undefined) {
         throw new ErrorHttp(400, "El operador debe indicar el paciente");
       }
-      // El operador solo opera sobre su propia sede, como pide la consigna.
+      // Regla 2: el operador solo opera sobre su propia sede, como pide la
+      // consigna. Si no tiene sede, o pide un turno en otra sede → 403.
       if (usuario.id_sede === null || datos.id_sede !== usuario.id_sede) {
         throw new ErrorHttp(403, "El operador solo puede solicitar turnos de su propia sede");
       }
       idPaciente = datos.id_paciente;
     }
 
+    // Las reglas de negocio que necesitan la base (agenda, horario libre,
+    // cobertura) las aplica el service. `await` espera a que termine.
     const turno = await turnoService.crearTurno(datos, idPaciente, usuario);
+    // Todo OK: 201 (Created) con el turno creado y un mensaje.
     responder(res, 201, "ok", { ...turno, mensaje: "Turno confirmado correctamente" });
   } catch (error) {
+    // Cualquier error (400, 403, 404, 409 o uno inesperado) va al manejador.
     next(error);
   }
 }

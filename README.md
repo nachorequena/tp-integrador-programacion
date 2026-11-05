@@ -13,6 +13,23 @@ Programación 2 — API de la clínica que consume el frontend Angular
 
 Stack: Node.js + Express 5 + TypeScript + MySQL/MariaDB (`mysql2` con SQL crudo, sin ORM), JWT y bcrypt.
 
+### Tecnologías y librerías del backend
+
+| Tecnología / librería | Versión | Para qué se usa |
+| --- | --- | --- |
+| **Node.js** | 24.11.1 (sirve 20.19+) | Entorno donde corre la API. |
+| **TypeScript** | 7.0 | Lenguaje de todo el código; `npm run build` lo compila a `dist/`. |
+| **Express** (`express`) | 5.2.1 | Servidor HTTP: rutas, middlewares y manejo de errores. |
+| **mysql2** | 3.23.3 | Conexión a MySQL/MariaDB con un pool, SQL escrito a mano (sin ORM) y transacciones. |
+| **MySQL / MariaDB** | 8.3 (WAMP) / 10.4+ | Base de datos `clinica`. |
+| **jsonwebtoken** | 9.0.3 | Firma y verificación del token JWT (login y `verificarToken`). |
+| **bcrypt** | 6.0.0 | Hash de las contraseñas al registrar y comparación al hacer login. |
+| **cors** | 2.8.6 | Permite que el frontend (otro puerto) llame a la API (`CORS_ORIGEN`). |
+| **dotenv** | 17.4.2 | Lee las variables del archivo `.env` (base, JWT, puerto). |
+| **swagger-ui-express** | 5.0.1 | Documentación interactiva de la API en `/docs` (desde `docs/openapi.ts`). |
+| **tsx** | 4.23 | Ejecuta TypeScript directo en desarrollo, con recarga (`npm run dev`). |
+| **Postman / Newman** | — | Colecciones de prueba de los endpoints (carpeta `postman/`). |
+
 ---
 
 ## Puesta en marcha

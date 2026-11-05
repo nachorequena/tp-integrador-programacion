@@ -99,14 +99,18 @@ async function obtenerCoberturaPaciente(
   conexion: PoolConnection,
   idPaciente: number,
 ): Promise<number> {
+  // Usa la conexión de la transacción (no el pool) para que la lectura forme
+  // parte de la misma transacción que el INSERT.
   const [filas] = await conexion.query<RowDataPacket[]>(
     "SELECT id_cobertura FROM usuario WHERE id = ? AND rol = 'paciente'",
     [idPaciente],
   );
 
+  // Sin filas: no hay usuario con ese id, o existe pero no es paciente → 404.
   if (filas.length === 0) {
     throw new ErrorHttp(404, "Paciente no encontrado");
   }
+  // Existe pero su id_cobertura es NULL → 400 (no se puede sacar turno).
   if (!filas[0].id_cobertura) {
     throw new ErrorHttp(400, "El paciente no tiene una cobertura registrada");
   }
@@ -154,20 +158,28 @@ async function notificarEvento(
   evento: EventoTurno,
   actor: PayloadJWT,
 ): Promise<void> {
+  // "15/11/2026 a las 09:30": aFechaLocal pasa "2026-11-15" a día/mes/año.
   const cuando = `${aFechaLocal(String(turno.fecha))} a las ${turno.hora}`;
+  // Tipo guardado en la tabla: "turno_confirmado", "turno_cancelado"...
   const tipo = `turno_${evento}`;
+  // Palabra para el mensaje: "atendido" se redacta más largo; los otros dos
+  // eventos se usan tal cual ("confirmado", "cancelado").
   const texto = evento === "atendido" ? "marcado como atendido" : evento;
 
+  // 1) Al paciente, siempre. Cada `await` hace un INSERT en `notificacion`.
   await notificacionService.crearNotificacion(
     turno.id_paciente,
     tipo,
     `Tu turno del ${cuando} con ${turno.medico} (${turno.especialidad}) fue ${texto}`,
   );
+  // 2) Al médico del turno, siempre.
   await notificacionService.crearNotificacion(
     turno.id_medico,
     tipo,
     `El turno de ${turno.paciente} del ${cuando} en ${turno.sede} fue ${texto}`,
   );
+  // 3) Al operador SOLO si él hizo la acción (`actor` = quien vino en el
+  //    token). Si la hizo el paciente o el médico, ya recibieron la suya arriba.
   if (actor.rol === "operador") {
     await notificacionService.crearNotificacion(
       actor.id,
@@ -208,17 +220,38 @@ export async function crearTurno(
   idPaciente: number,
   actor: PayloadJWT,
 ): Promise<TurnoDetallado> {
+  // Se pide UNA conexión dedicada al pool (y no `pool.query` directo) porque
+  // una transacción tiene que ejecutar todas sus consultas por la misma
+  // conexión: si cada consulta saliera por una distinta, el BEGIN/COMMIT no
+  // las agruparía.
   const conexion = await pool.getConnection();
+  // Acá se guarda el id del turno insertado, para buscarlo después del COMMIT.
   let idTurno: number;
 
+  // try / catch / finally:
+  //   - try: todos los pasos de la transacción. Cualquier `throw` (las
+  //     validaciones de abajo o un error de MySQL) salta directo al catch.
+  //   - catch: deshace TODO lo hecho (ROLLBACK) y vuelve a lanzar el error
+  //     para que llegue al controller → manejadorErrores.
+  //   - finally: se ejecuta SIEMPRE (haya salido bien o mal) y libera la conexión.
   try {
+    // BEGIN: desde acá, nada queda guardado de verdad hasta el COMMIT.
     await conexion.beginTransaction();
 
+    // VALIDACIÓN 1 — el paciente existe y tiene cobertura. Si no, la función
+    // lanza un 404 ("Paciente no encontrado") o un 400 ("no tiene cobertura").
+    // La cobertura del turno SIEMPRE sale de acá, nunca del cuerpo.
     const idCobertura = await obtenerCoberturaPaciente(conexion, idPaciente);
 
+    // VALIDACIÓN 2 — el horario es futuro. `yaPaso` arma la fecha+hora y la
+    // compara con "ahora": si ya pasó (incluso hoy más temprano) → 400.
     if (yaPaso(datos.fecha, datos.hora)) {
       throw new ErrorHttp(400, "No se puede pedir un turno para un horario que ya pasó");
     }
+
+    // VALIDACIÓN 3 — busca el rango de agenda que cubre ese horario: mismo
+    // médico, especialidad, sede y fecha, con hora_entrada <= hora pedida y
+    // hora_salida > hora pedida (un turno a la hora exacta de salida no entra).
 
     // Las horas son varchar(5) "HH:MM": compararlas como texto respeta el
     // orden cronológico porque siempre tienen dos dígitos (lo garantiza el
@@ -233,7 +266,13 @@ export async function crearTurno(
       [datos.id_medico, datos.id_especialidad, datos.id_sede, datos.fecha, datos.hora, datos.hora],
     );
 
+    // `agendas[0]` es el rango encontrado, o `undefined` si no hubo ninguno.
     const agenda = agendas[0];
+    // El if rechaza con 400 en dos casos:
+    //   a) `!agenda`: el médico no atiende a esa hora (en esa sede/especialidad);
+    //   b) `!esHorarioDeLaGrilla(...)`: la hora no cae en la grilla de 30 min
+    //      contada desde la entrada (rango 08:00 → vale 08:30, no vale 08:10),
+    //      o el turno no llega a terminar antes de la hora de salida.
     if (!agenda || !esHorarioDeLaGrilla(agenda as { hora_entrada: string; hora_salida: string }, datos.hora)) {
       throw new ErrorHttp(
         400,
@@ -241,27 +280,46 @@ export async function crearTurno(
       );
     }
 
+    // VALIDACIÓN 4 — el horario sigue libre. Trae las horas de los turnos
+    // CONFIRMADOS de ese rango (los cancelados liberan el lugar, por eso no
+    // cuentan; los atendidos son del pasado).
     const [confirmados] = await conexion.query<RowDataPacket[]>(
       "SELECT hora FROM turno WHERE id_agenda = ? AND estado = 'confirmado' AND hora IS NOT NULL",
       [agenda.id],
     );
+    // Pasa "HH:MM" a minutos desde medianoche ("09:30" → 570) para poder restar.
     const pedido = aMinutos(datos.hora);
+    // `.some` devuelve true si AL MENOS UN turno confirmado está a menos de 30
+    // minutos del pedido (Math.abs = distancia sin importar si es antes o
+    // después). Eso significa que se superpondrían.
     const ocupado = confirmados.some(
       (turno) => Math.abs(aMinutos(String(turno.hora)) - pedido) < DURACION_TURNO,
     );
+    // Ocupado → 409 Conflict. Es el error que el frontend detecta para volver
+    // al paso "Horario" del stepper y recargar los horarios libres.
     if (ocupado) {
       throw new ErrorHttp(409, "Ese horario ya fue tomado por otro paciente. Elegí otro horario.");
     }
 
+    // Todo validado: se inserta el turno, siempre en estado 'confirmado'. Los
+    // `?` se reemplazan en orden por los valores del array (mysql2 los escapa,
+    // así no hay inyección SQL).
     const [resultado] = await conexion.query<ResultSetHeader>(
       `INSERT INTO turno (nota, id_agenda, fecha, hora, id_paciente, id_cobertura, estado)
        VALUES (?, ?, ?, ?, ?, ?, 'confirmado')`,
       [datos.nota, agenda.id, datos.fecha, datos.hora, idPaciente, idCobertura],
     );
+    // `insertId` es el id autoincremental que MySQL le asignó a la fila nueva.
     idTurno = resultado.insertId;
 
+    // COMMIT: recién ahora el turno queda guardado y se libera el bloqueo del
+    // rango de agenda (otro pedido que estuviera esperando sigue y verá este turno).
     await conexion.commit();
   } catch (error) {
+    // Algo falló (una validación o la base): ROLLBACK deshace todo lo hecho
+    // desde el BEGIN, así no queda nada a medias. Después se vuelve a lanzar
+    // el MISMO error (`throw error`) para que el controller lo reciba y el
+    // cliente vea el 400/404/409 correcto.
     await conexion.rollback();
     throw error;
   } finally {
@@ -270,8 +328,14 @@ export async function crearTurno(
     conexion.release();
   }
 
+  // Fuera de la transacción (el turno ya está guardado): se vuelve a leer con
+  // JOINs para tener los nombres de médico, paciente, sede y especialidad, que
+  // necesitan las notificaciones y la respuesta al frontend.
   const turno = await buscarTurnoDetallado(idTurno);
+  // Crea las notificaciones "turno_confirmado" (paciente, médico y, si lo
+  // pidió un operador, el operador).
   await notificarEvento(turno, "confirmado", actor);
+  // Lo recibe el controller, que responde 201.
   return turno;
 }
 

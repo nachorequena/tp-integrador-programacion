@@ -35,6 +35,15 @@ import { verificarRol } from "../middlewares/verificarRol";
 
 export const rutasTurno = Router();
 
+// POST /turnos — pedir un turno. Express ejecuta las funciones EN ORDEN, y
+// cada una decide si llama a `next()` (sigue a la siguiente) o responde/corta:
+//   1) verificarToken: ¿vino un JWT válido? No → 401. Sí → deja el usuario en
+//      `req.usuario` y sigue.
+//   2) verificarRol("paciente", "operador"): ¿el rol del token es uno de esos?
+//      No (médico, admin) → 403. Sí → sigue.
+//   3) turnoController.crear: valida el cuerpo, llama al service y responde 201.
+// (Antes de todo esto, el middleware `auditar` montado en index.ts envuelve
+// `res.json` para registrar la acción en la auditoría si la respuesta sale bien.)
 rutasTurno.post(
   "/",
   verificarToken,
