@@ -57,7 +57,6 @@ export async function registrar(
     const idHistorial = await historialService.registrarHistorial(
       idTurno,
       usuario.id,
-      usuario.id_sede,
       datos,
     );
 

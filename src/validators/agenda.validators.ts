@@ -10,6 +10,10 @@
  * la base —que el médico exista y sea médico, que la sede exista, que el rango
  * no se solape con otro— viven en `agenda.service.ts`, porque un validador no
  * debería hacer queries.
+ *
+ * Con qué se conecta: lo usa `controllers/agenda.controller.ts`. Las reglas
+ * que necesitan la base (pertenencia, solapamiento, turnos confirmados) viven
+ * en `services/agenda.service.ts`.
  */
 
 import { DatosAgenda, FiltrosAgenda } from "../types";

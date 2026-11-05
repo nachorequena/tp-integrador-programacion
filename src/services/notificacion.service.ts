@@ -6,6 +6,10 @@
  *
  * No existe un endpoint público para crear notificaciones. Se generan
  * automáticamente cuando un turno es confirmado, cancelado o atendido.
+ *
+ * Con qué se conecta: `crearNotificacion` la llama `turno.service.ts`
+ * (confirmar, cancelar, atender); `listarPorUsuario` y `marcarComoLeida` los
+ * llama `controllers/notificacion.controller.ts`. Tabla: `notificacion`.
  */
 
 import { ResultSetHeader, RowDataPacket } from "mysql2";

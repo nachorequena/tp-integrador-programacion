@@ -17,6 +17,10 @@
  *
  * Los secretos NUNCA se escriben en el código: viven en `.env`, que está en el
  * `.gitignore`. El archivo versionado es `.env.example`, sin valores reales.
+ *
+ * Con qué se conecta: lo importan `src/index.ts` (puerto y CORS),
+ * `database/conexion.ts` (credenciales de la base) y `utils/jwt.ts` (secreto y
+ * vencimiento del token). Lee el archivo `.env` (ver `.env.example`).
  */
 
 import dotenv from "dotenv";

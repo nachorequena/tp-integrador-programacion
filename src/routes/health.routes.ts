@@ -3,6 +3,9 @@
  * ==============
  *
  * Endpoint de diagnóstico del servidor y la base.
+ *
+ * Con qué se conecta: lo monta `routes/index.ts` en `/health`; delega en
+ * `controllers/health.controller.ts`.
  */
 
 import { Router } from "express";

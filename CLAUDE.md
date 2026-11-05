@@ -12,7 +12,7 @@
 - **Qué es:** aplicación web para digitalizar la gestión de una clínica médica: usuarios, agenda médica y turnos de pacientes.
 - **Dos etapas de 4 semanas cada una:**
   1. **Backend** (semanas 1–4): Node.js + Express + MySQL/MariaDB. ✅ **Terminado.**
-  2. **Frontend** (semanas 5–8): Angular 21 + Angular Material, consumiendo esta API. **← estamos acá.** Vive en un **repositorio aparte** (lo exige la consigna): https://github.com/nachorequena/tp-integrador-frontend, carpeta local hermana `../tp-integrador-frontend`, con su propio `CLAUDE.md` y su bitácora.
+  2. **Frontend** (semanas 5–8): Angular 21 + Angular Material, consumiendo esta API. ✅ **Entrega final hecha** (consigna `docs/Frontend-enunciado-completo.pdf`, que reemplazó las semanas 2 a 4 del frontend). Vive en un **repositorio aparte** (lo exige la consigna): https://github.com/nachorequena/tp-integrador-frontend, carpeta local hermana `../tp-integrador-frontend`, con su propio `CLAUDE.md` y su bitácora.
 - Las consignas se liberan **semana a semana**. Cada entrega se construye sobre la anterior.
 
 ### Documentos de referencia (leer antes de codear)
@@ -24,6 +24,8 @@ Las fuentes originales están en la carpeta `docs/` del repo. Ante cualquier dud
 - `docs/Backend-semana-2.pdf` — consigna de la semana 2. ✅ entregada.
 - `docs/Backend-semana 3.pdf` — consigna de la semana 3. ✅ entregada.
 - `docs/Backend-semana 4.pdf` — consigna de la semana 4. ✅ entregada.
+- `docs/Frontend-enunciado-completo.pdf` — consigna final del frontend. Su sección "Sugerencias de cambios en el backend" es el origen de los cambios de la rama `entrega-frontend` (ver sección 9.5).
+- `docs/ARQUITECTURA.md` — recorrido de una petición y tabla endpoint → controller → service → rol.
 - `docs/clinica_ampliada.sql` — **script de la base. Es la fuente de verdad de los nombres exactos de tablas y columnas.** No inventes nombres: leé este archivo.
 
 > ⚠️ Ojo al citar los archivos: los PDF de las semanas 1 y 2 usan guion (`Backend-semana-1.pdf`) y los de la 3 y 4 usan espacio (`Backend-semana 3.pdf`). Así llegaron; no se renombraron para no romper enlaces ya entregados.
@@ -41,9 +43,11 @@ Las fuentes originales están en la carpeta `docs/` del repo. Ante cualquier dud
    ```sql
    CREATE DATABASE clinica CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
    ```
-   Después importar el script sobre esa base:
+   Después importar, en este orden:
    ```bash
    mysql -u root -p clinica < docs/clinica_ampliada.sql
+   mysql -u root -p clinica < scripts/usuarios-prueba.sql
+   mysql -u root -p clinica < scripts/datos-prueba.sql
    ```
 3. Copiar `.env.example` a `.env` y completar credenciales reales de la DB y el `JWT_SECRET`.
 4. `npm install` y luego `npm run dev`.
@@ -68,7 +72,7 @@ El enunciado es explícito: cada entrega debe enfocarse **solo en lo que toca es
 - Si tenés que crear estructura de carpetas o abstracciones "para después", hacelo solo si **no agrega complejidad hoy**.
 - Ante la duda de si algo pertenece a esta semana: **preguntá antes de codear**.
 
-**Alcance vigente:** 🏁 **El backend está cerrado.** Las cuatro semanas están entregadas y las 10 tablas de `clinica_ampliada.sql` están en uso. Ver el detalle en la sección 9.
+**Alcance vigente:** 🏁 **Backend y frontend cerrados.** La última entrega (consigna final del frontend) pidió ajustes a la API, autorizados por el humano y hechos en la rama `entrega-frontend` (sección 9.5). Antes de eso: las cuatro semanas están entregadas y las 10 tablas de `clinica_ampliada.sql` están en uso. Ver el detalle en la sección 9.
 
 Lo que sigue es la **etapa 2: frontend con Angular 21 + Angular Material (semanas 5–8)**, consumiendo esta API. Cuando salga esa consigna, la regla de oro se aplica igual: solo lo que pide la semana.
 
@@ -172,7 +176,7 @@ src/
 ├── database/                     # nombre literal que pide la consigna
 │   └── conexion.ts               # pool de conexión mysql2
 ├── docs/
-│   └── openapi.ts                # spec OpenAPI 3 de los 37 endpoints (semana 4)
+│   └── openapi.ts                # spec OpenAPI 3 de los 46 endpoints
 ├── controllers/                  # reciben req/res, delegan en services
 │   ├── health.controller.ts      · auth.controller.ts
 │   ├── sede.controller.ts        · especialidad.controller.ts
@@ -180,6 +184,8 @@ src/
 │   ├── turno.controller.ts       · historial.controller.ts
 │   ├── notificacion.controller.ts
 │   ├── auditoria.controller.ts   · reporte.controller.ts
+│   ├── medico.controller.ts      · disponibilidad.controller.ts   (etapa frontend)
+│   ├── paciente.controller.ts    · usuario.controller.ts          (etapa frontend)
 ├── services/                     # lógica de negocio + acceso a datos (SQL)
 │   ├── auth.service.ts           · usuario.service.ts
 │   ├── sede.service.ts           · especialidad.service.ts
@@ -187,7 +193,9 @@ src/
 │   ├── turno.service.ts          · historial.service.ts
 │   ├── notificacion.service.ts
 │   ├── auditoria.service.ts      · reporte.service.ts
-│   └── dependencias.service.ts   # chequeo de FKs antes de un DELETE
+│   ├── dependencias.service.ts   # chequeo de FKs antes de un DELETE
+│   ├── medico.service.ts         · disponibilidad.service.ts      (etapa frontend)
+│   ├── paciente.service.ts       · gestion-usuario.service.ts     (etapa frontend)
 ├── middlewares/
 │   ├── verificarToken.ts         # 401 si el JWT falta o es inválido
 │   ├── verificarRol.ts           # 403 si el rol no está permitido
@@ -201,16 +209,21 @@ src/
 │   ├── turno.routes.ts           · historial.routes.ts
 │   ├── notificacion.routes.ts
 │   ├── auditoria.routes.ts       · reporte.routes.ts
+│   ├── medico.routes.ts          · disponibilidad.routes.ts       (etapa frontend)
+│   ├── paciente.routes.ts        · usuario.routes.ts              (etapa frontend)
 ├── utils/
 │   ├── respuesta.ts              # helper de respuesta uniforme
 │   ├── errorHttp.ts              # error de negocio con código HTTP
-│   └── jwt.ts                    # firmar/verificar tokens
+│   ├── jwt.ts                    # firmar/verificar tokens
+│   └── fechas.ts                 # hoy/ahora locales, minutos ↔ "HH:MM" (etapa frontend)
 ├── validators/
 │   ├── comunes.ts                # helpers compartidos (texto, fecha, hora, ids)
 │   ├── auth.validators.ts        · entidades.validators.ts
 │   ├── agenda.validators.ts      · turno.validators.ts
 │   ├── historial.validators.ts
 │   ├── auditoria.validators.ts   · reporte.validators.ts
+│   ├── medico.validators.ts      · disponibilidad.validators.ts   (etapa frontend)
+│   ├── paciente.validators.ts    · usuario.validators.ts          (etapa frontend)
 ├── types/
 │   ├── index.ts                  # interfaces de todas las entidades
 │   └── express.d.ts              # agrega req.usuario al Request de Express
@@ -218,8 +231,9 @@ src/
 
 postman/                          # una colección de pruebas por semana
 scripts/
-└── usuarios-prueba.sql           # contraseñas reales + 2do médico
-docs/                             # consignas en PDF + script de la base
+├── usuarios-prueba.sql           # contraseñas reales + 2do médico
+└── datos-prueba.sql              # 3 médicos, agenda en 2 sedes, turnos en 3 estados
+docs/                             # consignas en PDF, script de la base, ARQUITECTURA.md
 ```
 
 > La consigna pide textualmente `src/controllers`, `src/routes` y `src/database` ("o similar"). Se usan los tres con el nombre literal: cuesta cero y elimina cualquier objeción en la corrección.
@@ -345,6 +359,18 @@ esperado, está en dos lugares que sí conviene consultar antes que esta secció
 - **`README.md`** — tablas de endpoints por semana, más las decisiones de diseño.
 
 Las 10 tablas de `clinica_ampliada.sql` están en uso.
+
+### 9.5 Etapa frontend — cambios a la API (rama `entrega-frontend`) ✅
+
+Pedidos por la consigna final del frontend ("Sugerencias de cambios en el backend") y autorizados por el humano. Detalle en el README ("Cambios para el frontend") y en Swagger.
+
+- **Nuevos:** `GET /medicos`, `GET /disponibilidad/fechas`, `GET /disponibilidad/horarios`, `GET/POST /pacientes`, `PUT /pacientes/mis-datos`, `GET/POST/PUT /usuarios`.
+- **`GET /sedes` y `GET /especialidades`** abiertos a cualquier sesión (el resto sigue admin).
+- **Agenda:** operador solo en su sede (403); el médico tiene que tener la especialidad; 409 al eliminar con turnos o recortar dejando confirmados afuera; el listado trae `turnos_confirmados`.
+- **Turnos:** listados con nombres e historial; médico multi-sede; grilla de 30 min (`DURACION_TURNO`) compartida con la disponibilidad; alta transaccional; `atender` con historial opcional; notificaciones a paciente, médico y operador actor.
+- **Auditoría:** paginada (`{items,total,pagina,limite}`), filtro `usuario`, audita usuarios/pacientes.
+- **Datos de prueba:** `scripts/datos-prueba.sql`.
+- **Colección:** `postman/Clinica-Frontend-Final.postman_collection.json` (41 requests, 90 asserts, re-ejecutable).
 
 ### 9.0 Semana 2 — ENTREGADA ✅ (referencia)
 
@@ -555,9 +581,20 @@ Las cuatro colecciones están en `postman/`, una por semana.
 > Mantené esta sección al día para conservar contexto entre sesiones de Claude Code.
 > Semanas más recientes arriba.
 
-**Semana en curso:** Backend completo. El frontend avanza en su propio repositorio (https://github.com/nachorequena/tp-integrador-frontend); su bitácora está en el `CLAUDE.md` de ese repo.
+**Semana en curso:** Entrega final hecha (backend + frontend). El frontend avanza en su propio repositorio (https://github.com/nachorequena/tp-integrador-frontend); su bitácora está en el `CLAUDE.md` de ese repo.
 
 ### Etapa 2 — cambios al backend pedidos por el frontend
+
+- **Entrega final del frontend (rama `entrega-frontend`).** Se implementaron las sugerencias de la consigna final (sección 9.5). Decisiones:
+  - **Turnos de 30 minutos** en una grilla que arranca en la hora de entrada del rango. Disponibilidad y alta usan la misma función (`esHorarioDeLaGrilla`) para que se ofrezca exactamente lo que se acepta.
+  - **Un turno bloquea por distancia (< 30 min), no por igualdad de hora**, así un rango editado no puede ofrecer horarios superpuestos con turnos viejos.
+  - **Eliminar un rango con turnos atendidos o cancelados también da 409**: son FK del historial. Mensaje distinto al de los confirmados.
+  - **El rol de un usuario no se cambia al editarlo** (el frontend lo muestra fijo): evita filas huérfanas de rol (turnos de un "médico" que pasó a paciente, etc.).
+  - **Las especialidades de un médico se actualizan por diferencia** y no borrando y reinsertando: `medico_especialidad.id` es `tinyint`.
+  - **Se notifica también al operador cuando él actúa**: el criterio pide que el contador de quien hace la acción se actualice.
+  - **`verificarToken` sigue confiando en el payload**: si el admin cambia la sede de un operador, el cambio rige desde su próximo login.
+  - **Las colecciones de las semanas 1–4 tienen asserts que ya no aplican a la API final** (403 en `/sedes`, operador en otra sede, `/auditoria` como array, textos de mensajes). Esas entregas siguen en sus ramas; para la API final vale `Clinica-Frontend-Final`.
+  - Verificado con MySQL 8.3 en **modo estricto**, base aparte `clinica_entrega`, y recorrido completo en el navegador con los cuatro roles.
 
 - **CORS habilitado** (paquete `cors`, autorizado por el humano). La consigna de la semana 1 del frontend pide el backend con CORS para `http://localhost:4200`. Un solo origen autorizado, configurable con `CORS_ORIGEN`. Va en `main`; las ramas `entrega-backend-N` no se tocaron.
 

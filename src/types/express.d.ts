@@ -14,6 +14,9 @@
  * Los archivos `.d.ts` solo declaran tipos: no generan JavaScript. No hace
  * falta importarlo en ningún lado, alcanza con que esté dentro de `src/` para
  * que el compilador lo tome (ver `include` en tsconfig.json).
+ *
+ * Con qué se conecta: `middlewares/verificarToken.ts` escribe `req.usuario`, y
+ * lo leen `verificarRol`, el middleware de auditoría y los controllers.
  */
 
 import { PayloadJWT } from "./index";

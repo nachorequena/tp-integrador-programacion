@@ -19,6 +19,10 @@
  *
  * El mismo validador sirve para el alta y para la modificación: como el PUT
  * reemplaza la fila completa, exige exactamente los mismos campos que el POST.
+ *
+ * Con qué se conecta: lo usan `sede.controller.ts`,
+ * `especialidad.controller.ts` y `cobertura.controller.ts`. Los mismos largos
+ * los replica el frontend en sus formularios.
  */
 
 import { DatosCobertura, DatosEspecialidad, DatosSede } from "../types";

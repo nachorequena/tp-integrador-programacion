@@ -12,6 +12,10 @@
  * No hay endpoint de alta a propósito: la consigna pide que las notificaciones
  * se generen internamente ante cada cambio de estado de un turno. Crearlas
  * desde afuera permitiría falsificarlas.
+ *
+ * Con qué se conecta: lo monta `routes/index.ts` en `/notificaciones`; delega
+ * en `controllers/notificacion.controller.ts`. Lo consume la campana del
+ * encabezado del frontend.
  */
 
 import { Router } from "express";

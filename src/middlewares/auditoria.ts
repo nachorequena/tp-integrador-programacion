@@ -78,8 +78,17 @@ interface RutaAuditada {
  * notificaciones como leídas.
  */
 const RUTAS_AUDITADAS: RutaAuditada[] = [
-  // Usuarios. El único alta de usuario del sistema es el registro público.
+  // Usuarios. Hay cuatro caminos para crear o modificar uno:
+  //   - el registro público (el actor es el propio usuario creado);
+  //   - el alta de pacientes del operador (etapa frontend);
+  //   - el alta y la edición del administrador (etapa frontend; la consigna
+  //     pide que "cada alta y modificación de usuarios quede registrada");
+  //   - la edición de "mis datos" del paciente (etapa frontend).
   { metodo: "POST", patron: /^\/auth\/registro$/, entidad: "usuario", accion: "ALTA" },
+  { metodo: "POST", patron: /^\/pacientes$/, entidad: "usuario", accion: "ALTA" },
+  { metodo: "PUT", patron: /^\/pacientes\/mis-datos$/, entidad: "usuario", accion: "MODIFICACION" },
+  { metodo: "POST", patron: /^\/usuarios$/, entidad: "usuario", accion: "ALTA" },
+  { metodo: "PUT", patron: /^\/usuarios\/(\d+)$/, entidad: "usuario", accion: "MODIFICACION" },
 
   // Sedes
   { metodo: "POST", patron: /^\/sedes$/, entidad: "sede", accion: "ALTA" },

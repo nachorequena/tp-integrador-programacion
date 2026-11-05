@@ -10,6 +10,11 @@
  * obliga a devolver el cuerpo vacío, y el enunciado exige que TODAS las
  * respuestas lleven la estructura uniforme. Entre el purismo REST y el
  * requisito del TP, gana el requisito.
+ *
+ * Con qué se conecta: `routes/sede.routes.ts` → este controller →
+ * `validators/entidades.validators.ts` y `services/sede.service.ts`. Lo
+ * consumen la pantalla de sedes del administrador y todos los selectores de
+ * sede del frontend.
  */
 
 import { NextFunction, Request, Response } from "express";

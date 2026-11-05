@@ -1,0 +1,2107 @@
+{
+  "info": {
+    "name": "Clínica — Etapa frontend (entrega final)",
+    "description": "Endpoints nuevos y modificados para el frontend final. Requiere la base cargada con docs/clinica_ampliada.sql, scripts/usuarios-prueba.sql y scripts/datos-prueba.sql (ver README). Se puede correr completa con el Runner: cada ejecución usa un DNI nuevo y el primer horario libre.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Sesiones de los cuatro roles",
+      "description": "Guarda un token por rol en variables de la colección.",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"18222333\",\n  \"password\": \"admin123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.collectionVariables.set('tokenAdmin', pm.response.json().datos.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login operador (Sede Centro)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"15200548\",\n  \"password\": \"operador123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.collectionVariables.set('tokenOperador', pm.response.json().datos.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login médica Ana Lopez",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"20111222\",\n  \"password\": \"medico123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.collectionVariables.set('tokenMedico', pm.response.json().datos.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login médico Carlos Ruiz",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"25333444\",\n  \"password\": \"medico123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.collectionVariables.set('tokenRuiz', pm.response.json().datos.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login paciente Franco Friggeri",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"36000960\",\n  \"password\": \"paciente123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.collectionVariables.set('tokenPaciente', pm.response.json().datos.token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Catálogos abiertos a cualquier sesión",
+      "item": [
+        {
+          "name": "GET /sedes como paciente → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sedes"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /especialidades como médico → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/especialidades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "especialidades"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenMedico}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /sedes como paciente → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sedes"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"X\",\n  \"direccion\": \"Y\",\n  \"telefono\": \"1\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /sedes sin token → 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/sedes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sedes"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Médicos y disponibilidad",
+      "item": [
+        {
+          "name": "GET /medicos (todos)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.test('sin datos personales', () => pm.expect(pm.response.json().datos[0]).to.not.have.property('dni'));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(); d.setDate(d.getDate() + 2);",
+                  "const f = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');",
+                  "pm.collectionVariables.set('pasadoManiana', f);",
+                  "const h = new Date();",
+                  "pm.collectionVariables.set('hoy', h.getFullYear() + '-' + String(h.getMonth()+1).padStart(2,'0') + '-' + String(h.getDate()).padStart(2,'0'));",
+                  "pm.collectionVariables.set('dniNuevo', String(40000000 + Math.floor(Math.random() * 9999999)).slice(0, 8));",
+                  "pm.collectionVariables.set('dniMedico', String(30000000 + Math.floor(Math.random() * 9999999)).slice(0, 8));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /medicos traumatología en Sede Norte",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/medicos?id_especialidad=1&id_sede=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "medicos"
+              ],
+              "query": [
+                {
+                  "key": "id_especialidad",
+                  "value": "1"
+                },
+                {
+                  "key": "id_sede",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /disponibilidad/fechas (Lopez, Trauma, Norte)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/disponibilidad/fechas?id_medico=3&id_especialidad=1&id_sede=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "disponibilidad",
+                "fechas"
+              ],
+              "query": [
+                {
+                  "key": "id_medico",
+                  "value": "3"
+                },
+                {
+                  "key": "id_especialidad",
+                  "value": "1"
+                },
+                {
+                  "key": "id_sede",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.test('trae fechas', () => pm.expect(pm.response.json().datos).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /disponibilidad/horarios pasado mañana",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/disponibilidad/horarios?id_medico=3&id_especialidad=1&id_sede=2&fecha={{pasadoManiana}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "disponibilidad",
+                "horarios"
+              ],
+              "query": [
+                {
+                  "key": "id_medico",
+                  "value": "3"
+                },
+                {
+                  "key": "id_especialidad",
+                  "value": "1"
+                },
+                {
+                  "key": "id_sede",
+                  "value": "2"
+                },
+                {
+                  "key": "fecha",
+                  "value": "{{pasadoManiana}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "const libres = pm.response.json().datos; pm.test('hay horarios libres', () => pm.expect(libres.length).to.be.above(0)); pm.collectionVariables.set('horaLibre', libres[0].hora);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /disponibilidad como médico → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/disponibilidad/fechas?id_medico=3&id_especialidad=1&id_sede=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "disponibilidad",
+                "fechas"
+              ],
+              "query": [
+                {
+                  "key": "id_medico",
+                  "value": "3"
+                },
+                {
+                  "key": "id_especialidad",
+                  "value": "1"
+                },
+                {
+                  "key": "id_sede",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenMedico}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Turnos",
+      "item": [
+        {
+          "name": "POST /turnos en un horario libre → 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_medico\": 3,\n  \"id_especialidad\": 1,\n  \"id_sede\": 2,\n  \"fecha\": \"{{pasadoManiana}}\",\n  \"hora\": \"{{horaLibre}}\",\n  \"nota\": \"Prueba Postman\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 201', () => pm.response.to.have.status(201));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.collectionVariables.set('idTurno', pm.response.json().datos.id); pm.test('trae nombres', () => pm.expect(pm.response.json().datos.medico).to.be.a('string'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /turnos el mismo horario → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_medico\": 3,\n  \"id_especialidad\": 1,\n  \"id_sede\": 2,\n  \"fecha\": \"{{pasadoManiana}}\",\n  \"hora\": \"{{horaLibre}}\",\n  \"nota\": \"Repetido\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /turnos fuera de la grilla de 30 min → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_medico\": 3,\n  \"id_especialidad\": 1,\n  \"id_sede\": 2,\n  \"fecha\": \"{{pasadoManiana}}\",\n  \"hora\": \"15:10\",\n  \"nota\": \"Fuera de grilla\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /turnos/mios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos/mios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos",
+                "mios"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /turnos/medico de pasado mañana (todas sus sedes)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos/medico?fecha={{pasadoManiana}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos",
+                "medico"
+              ],
+              "query": [
+                {
+                  "key": "fecha",
+                  "value": "{{pasadoManiana}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenMedico}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /turnos/sede de hoy, filtrado por médico",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos/sede?fecha={{hoy}}&id_medico=3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos",
+                "sede"
+              ],
+              "query": [
+                {
+                  "key": "fecha",
+                  "value": "{{hoy}}"
+                },
+                {
+                  "key": "id_medico",
+                  "value": "3"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOperador}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH atender por otro médico → 403",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos/{{idTurno}}/atender",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos",
+                "{{idTurno}}",
+                "atender"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenRuiz}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diagnostico\": \"x\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH atender con historial (médico en otra sede) → 200",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos/{{idTurno}}/atender",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos",
+                "{{idTurno}}",
+                "atender"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenMedico}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diagnostico\": \"Control sin novedades\",\n  \"tratamiento\": \"Ninguno\",\n  \"observaciones\": \"Prueba Postman\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.test('guardó el historial', () => pm.expect(pm.response.json().datos.diagnostico).to.eql('Control sin novedades'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH cancelar un turno ya atendido → 400",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/turnos/{{idTurno}}/cancelar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "turnos",
+                "{{idTurno}}",
+                "cancelar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Agenda: sede del operador y turnos confirmados",
+      "item": [
+        {
+          "name": "GET /agendas de otra sede (consulta permitida) → 200",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agendas?id_sede=2&fecha={{hoy}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendas"
+              ],
+              "query": [
+                {
+                  "key": "id_sede",
+                  "value": "2"
+                },
+                {
+                  "key": "fecha",
+                  "value": "{{hoy}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOperador}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.test('trae turnos_confirmados', () => { const d = pm.response.json().datos; if (d.length) pm.expect(d[0]).to.have.property('turnos_confirmados'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /agendas del operador en otra sede → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agendas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOperador}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_medico\": 5,\n  \"id_especialidad\": 2,\n  \"id_sede\": 2,\n  \"fecha\": \"{{pasadoManiana}}\",\n  \"hora_entrada\": \"07:00\",\n  \"hora_salida\": \"08:00\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /agendas con especialidad que el médico no tiene → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agendas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agendas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOperador}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_medico\": 5,\n  \"id_especialidad\": 1,\n  \"id_sede\": 1,\n  \"fecha\": \"{{pasadoManiana}}\",\n  \"hora_entrada\": \"20:00\",\n  \"hora_salida\": \"21:00\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Pacientes",
+      "item": [
+        {
+          "name": "GET /pacientes?busqueda=fri (operador)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes?busqueda=fri",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ],
+              "query": [
+                {
+                  "key": "busqueda",
+                  "value": "fri"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOperador}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pacientes?busqueda=4011 (médico)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes?busqueda=4011",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ],
+              "query": [
+                {
+                  "key": "busqueda",
+                  "value": "4011"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenMedico}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pacientes como paciente → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes?busqueda=fri",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ],
+              "query": [
+                {
+                  "key": "busqueda",
+                  "value": "fri"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pacientes (alta por operador) → 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOperador}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Postman\",\n  \"apellido\": \"Prueba\",\n  \"dni\": \"{{dniNuevo}}\",\n  \"email\": \"p{{dniNuevo}}@mail.com\",\n  \"telefono\": \"3425000000\",\n  \"fecha_nacimiento\": \"1990-01-01\",\n  \"password\": \"paciente123\",\n  \"id_cobertura\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 201', () => pm.response.to.have.status(201));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /pacientes/mis-datos → 200",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/mis-datos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "mis-datos"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"asdas@gaasds.com\",\n  \"telefono\": \"342545555\",\n  \"id_cobertura\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /pacientes/mis-datos con nombre → 400",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pacientes/mis-datos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pacientes",
+                "mis-datos"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenPaciente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"asdas@gaasds.com\",\n  \"telefono\": \"342545555\",\n  \"id_cobertura\": 1,\n  \"nombre\": \"Otro\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Usuarios (administrador)",
+      "item": [
+        {
+          "name": "GET /usuarios paginado y filtrado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios?rol=medico&pagina=1&limite=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ],
+              "query": [
+                {
+                  "key": "rol",
+                  "value": "medico"
+                },
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "limite",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.test('paginado', () => pm.expect(pm.response.json().datos).to.have.keys('items','total','pagina','limite'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /usuarios médico → 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Medico\",\n  \"apellido\": \"Postman\",\n  \"dni\": \"{{dniMedico}}\",\n  \"email\": \"m{{dniMedico}}@clinica.com\",\n  \"telefono\": \"3424000000\",\n  \"fecha_nacimiento\": \"1980-01-01\",\n  \"rol\": \"medico\",\n  \"password\": \"medico123\",\n  \"id_sede\": 2,\n  \"especialidades\": [\n    2\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 201', () => pm.response.to.have.status(201));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /usuarios con DNI repetido → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Medico\",\n  \"apellido\": \"Repetido\",\n  \"dni\": \"{{dniMedico}}\",\n  \"email\": \"r{{dniMedico}}@clinica.com\",\n  \"telefono\": \"3424000000\",\n  \"fecha_nacimiento\": \"1980-01-01\",\n  \"rol\": \"medico\",\n  \"password\": \"medico123\",\n  \"id_sede\": 2,\n  \"especialidades\": [\n    2\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /usuarios con rol paciente → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"X\",\n  \"apellido\": \"Y\",\n  \"dni\": \"30999888\",\n  \"email\": \"xy@mail.com\",\n  \"telefono\": \"1\",\n  \"fecha_nacimiento\": \"1980-01-01\",\n  \"rol\": \"paciente\",\n  \"password\": \"123456\",\n  \"id_cobertura\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /usuarios/3 quitando especialidad con agenda → 409",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "3"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Ana\",\n  \"apellido\": \"Lopez\",\n  \"dni\": \"20111222\",\n  \"email\": \"alopez@clinica.com\",\n  \"telefono\": \"3424111222\",\n  \"fecha_nacimiento\": \"1980-05-10\",\n  \"rol\": \"medico\",\n  \"id_sede\": 1,\n  \"especialidades\": [\n    2\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /usuarios/3 sin cambios de especialidad → 200",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "3"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Ana\",\n  \"apellido\": \"Lopez\",\n  \"dni\": \"20111222\",\n  \"email\": \"alopez@clinica.com\",\n  \"telefono\": \"3424111222\",\n  \"fecha_nacimiento\": \"1980-05-10\",\n  \"rol\": \"medico\",\n  \"id_sede\": 1,\n  \"especialidades\": [\n    1\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /usuarios como operador → 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenOperador}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Auditoría paginada",
+      "item": [
+        {
+          "name": "GET /auditoria?entidad=usuario&limite=5",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?entidad=usuario&limite=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "entidad",
+                  "value": "usuario"
+                },
+                {
+                  "key": "limite",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });",
+                  "pm.test('lo más reciente primero', () => { const i = pm.response.json().datos.items; if (i.length > 1) pm.expect(i[0].fecha >= i[1].fecha).to.be.true; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auditoria?usuario=gomez",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auditoria?usuario=gomez",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auditoria"
+              ],
+              "query": [
+                {
+                  "key": "usuario",
+                  "value": "gomez"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('formato uniforme', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('codigo','estado','datos'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "tokenAdmin",
+      "value": ""
+    },
+    {
+      "key": "tokenOperador",
+      "value": ""
+    },
+    {
+      "key": "tokenMedico",
+      "value": ""
+    },
+    {
+      "key": "tokenRuiz",
+      "value": ""
+    },
+    {
+      "key": "tokenPaciente",
+      "value": ""
+    },
+    {
+      "key": "hoy",
+      "value": ""
+    },
+    {
+      "key": "pasadoManiana",
+      "value": ""
+    },
+    {
+      "key": "horaLibre",
+      "value": ""
+    },
+    {
+      "key": "idTurno",
+      "value": ""
+    },
+    {
+      "key": "dniNuevo",
+      "value": ""
+    },
+    {
+      "key": "dniMedico",
+      "value": ""
+    }
+  ]
+}

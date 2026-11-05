@@ -6,6 +6,9 @@
  * simple antes de avanzar", y es lo primero que conviene mirar cuando algo no
  * anda: separa "el servidor no está levantado" de "el servidor está bien pero
  * no llega a la base", que son dos problemas con soluciones muy distintas.
+ *
+ * Con qué se conecta: `routes/health.routes.ts` → este controller →
+ * `database/conexion.ts` (`probarConexion`).
  */
 
 import { NextFunction, Request, Response } from "express";

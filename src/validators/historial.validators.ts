@@ -7,6 +7,10 @@
  * Las reglas que dependen de la base —que el turno exista, que esté atendido,
  * que lo haya atendido este médico, que no tenga ya un historial cargado—
  * viven en `historial.service.ts`.
+ *
+ * Con qué se conecta: lo usan `controllers/historial.controller.ts` (`POST
+ * /historial/:idTurno`) y `controllers/turno.controller.ts` (historial dentro
+ * de `PATCH /turnos/:id/atender`).
  */
 
 import { DatosHistorial } from "../types";

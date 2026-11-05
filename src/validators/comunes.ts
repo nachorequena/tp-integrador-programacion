@@ -10,6 +10,9 @@
  * Convención de los validadores del proyecto: acumulan los errores en un array
  * y al final llaman a `lanzarSiHayErrores`, para que el cliente reciba TODOS
  * los problemas en un solo 400 y no los descubra de a uno.
+ *
+ * Con qué se conecta: lo importan todos los archivos de `validators/` y
+ * algunos controllers (`validarIdRuta`, `comoObjeto`).
  */
 
 import { ErrorHttp } from "../utils/errorHttp";
@@ -221,4 +224,77 @@ export function lanzarSiHayErrores(errores: string[]): void {
   if (errores.length > 0) {
     throw new ErrorHttp(400, errores.join("; "));
   }
+}
+
+/**
+ * Valida un id OPCIONAL que llega por query string (un filtro de listado).
+ *
+ * Ausente o vacío significa "sin filtro" y devuelve `undefined`. Si vino algo,
+ * tiene que ser un entero positivo: un `?id_sede=abc` no se ignora en
+ * silencio, porque devolvería un listado sin filtrar y quien consume la API
+ * creería que está viendo una sola sede.
+ *
+ * @param valor Valor crudo de la query.
+ * @param nombreCampo Nombre del parámetro, para el mensaje de error.
+ * @param errores Array donde se acumulan los errores encontrados.
+ * @returns El id, o `undefined` si no vino.
+ */
+export function validarIdOpcional(
+  valor: unknown,
+  nombreCampo: string,
+  errores: string[],
+): number | undefined {
+  if (valor === undefined || valor === null || valor === "") return undefined;
+  const id = Number(valor);
+  if (!Number.isInteger(id) || id <= 0) {
+    errores.push(`${nombreCampo} debe ser un número entero positivo`);
+    return undefined;
+  }
+  return id;
+}
+
+/** Filas por página cuando el cliente no indica `limite`. */
+const LIMITE_POR_DEFECTO = 10;
+
+/**
+ * Tope de filas por página. Evita que un `?limite=100000` convierta un
+ * listado paginado en uno sin paginar.
+ */
+const LIMITE_MAXIMO = 50;
+
+/**
+ * Valida `pagina` y `limite` de un listado paginado.
+ *
+ * Los dos son opcionales: sin ellos se devuelve la primera página de
+ * `LIMITE_POR_DEFECTO` filas. Los usan `GET /usuarios` y `GET /auditoria`,
+ * que la consigna del frontend pide paginados.
+ *
+ * @param query `req.query` como diccionario.
+ * @param errores Array donde se acumulan los errores encontrados.
+ * @returns Página y límite ya convertidos a número.
+ */
+export function validarPaginacion(
+  query: Record<string, unknown>,
+  errores: string[],
+): { pagina: number; limite: number } {
+  let pagina = 1;
+  let limite = LIMITE_POR_DEFECTO;
+
+  if (query.pagina !== undefined && query.pagina !== "") {
+    pagina = Number(query.pagina);
+    if (!Number.isInteger(pagina) || pagina <= 0) {
+      errores.push("pagina debe ser un número entero positivo");
+      pagina = 1;
+    }
+  }
+
+  if (query.limite !== undefined && query.limite !== "") {
+    limite = Number(query.limite);
+    if (!Number.isInteger(limite) || limite <= 0 || limite > LIMITE_MAXIMO) {
+      errores.push(`limite debe ser un número entero entre 1 y ${LIMITE_MAXIMO}`);
+      limite = LIMITE_POR_DEFECTO;
+    }
+  }
+
+  return { pagina, limite };
 }

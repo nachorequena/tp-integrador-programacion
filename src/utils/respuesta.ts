@@ -12,6 +12,10 @@
  *
  * REGLA: nunca llamar a `res.json()` o `res.send()` directamente en un
  * controller. Siempre a través de `responder`.
+ *
+ * Con qué se conecta: lo usan TODOS los controllers, el manejador de errores y
+ * el 404 de `src/index.ts`. Es la única forma de responder del proyecto, así
+ * el frontend siempre recibe `{ codigo, estado, datos }`.
  */
 
 import { Response } from "express";

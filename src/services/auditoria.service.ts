@@ -9,11 +9,22 @@
  * aceptación pide justamente eso —"sin código repetido en cada endpoint"—, así
  * que si algún día aparece un `registrarLog` dentro de un controller, es señal
  * de que algo se hizo mal.
+ *
+ * Con qué se conecta: `registrarLog` lo llama SOLO `middlewares/auditoria.ts`;
+ * `listarLogs` lo llama `controllers/auditoria.controller.ts` (`GET
+ * /auditoria`, pantalla de auditoría del frontend). Tablas: `log_auditoria` y
+ * `usuario`.
  */
 
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { pool } from "../database/conexion";
-import { EntradaAuditoria, FiltrosAuditoria, LogAuditoria } from "../types";
+import {
+  EntradaAuditoria,
+  FiltrosAuditoria,
+  LogAuditoria,
+  PaginaDe,
+  Paginacion,
+} from "../types";
 
 /** Largo de `log_auditoria.detalle` en la base. */
 const MAXIMO_DETALLE = 255;
@@ -72,9 +83,9 @@ const SELECT_LOG = `SELECT
      JOIN usuario u ON u.id = l.id_usuario`;
 
 /**
- * Lista el log aplicando los filtros recibidos.
+ * Lista el log aplicando los filtros recibidos, paginado.
  *
- * Los cuatro filtros son opcionales y se combinan con AND. El WHERE se arma
+ * Los filtros son opcionales y se combinan con AND. El WHERE se arma
  * dinámicamente: por cada filtro presente se agrega una condición con `?`, así
  * la consulta sigue parametrizada.
  *
@@ -83,16 +94,31 @@ const SELECT_LOG = `SELECT
  * `<= '2026-03-15'` dejaría afuera todo lo de ese día a partir de las 00:00:01.
  * Por eso el extremo superior compara contra el final del día.
  *
+ * La paginación (consigna del frontend: "listado paginado, con los registros
+ * más recientes primero") se resuelve con dos consultas sobre el mismo WHERE:
+ * una cuenta el total y otra trae solo la página con `LIMIT`/`OFFSET`.
+ *
  * @param filtros Filtros ya validados.
- * @returns Las entradas que cumplen, de la más reciente a la más antigua.
+ * @param paginacion Página y tamaño de página.
+ * @returns La página pedida, de la entrada más reciente a la más antigua, y
+ *   el total que cumple los filtros.
  */
-export async function listarLogs(filtros: FiltrosAuditoria): Promise<LogAuditoria[]> {
+export async function listarLogs(
+  filtros: FiltrosAuditoria,
+  paginacion: Paginacion,
+): Promise<PaginaDe<LogAuditoria>> {
   const condiciones: string[] = [];
   const parametros: unknown[] = [];
 
   if (filtros.id_usuario !== undefined) {
     condiciones.push("l.id_usuario = ?");
     parametros.push(filtros.id_usuario);
+  }
+
+  if (filtros.usuario !== undefined) {
+    // Busca en apellido, nombre o DNI de quien hizo la acción.
+    condiciones.push("(u.apellido LIKE ? OR u.nombre LIKE ? OR u.dni LIKE ?)");
+    parametros.push(`%${filtros.usuario}%`, `%${filtros.usuario}%`, `${filtros.usuario}%`);
   }
 
   if (filtros.entidad !== undefined) {
@@ -112,12 +138,27 @@ export async function listarLogs(filtros: FiltrosAuditoria): Promise<LogAuditori
 
   const where = condiciones.length > 0 ? ` WHERE ${condiciones.join(" AND ")}` : "";
 
-  // El desempate por id no es decorativo: `fecha` tiene precisión de segundos
-  // y varias acciones seguidas caen en el mismo segundo.
-  const [filas] = await pool.query<RowDataPacket[]>(
-    `${SELECT_LOG}${where} ORDER BY l.fecha DESC, l.id DESC`,
+  // El conteo necesita el mismo JOIN que el listado: el filtro `usuario` mira
+  // columnas de la tabla `usuario`.
+  const [conteo] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS total
+       FROM log_auditoria l
+       JOIN usuario u ON u.id = l.id_usuario${where}`,
     parametros,
   );
 
-  return filas as LogAuditoria[];
+  // El desempate por id no es decorativo: `fecha` tiene precisión de segundos
+  // y varias acciones seguidas caen en el mismo segundo.
+  const desplazamiento = (paginacion.pagina - 1) * paginacion.limite;
+  const [filas] = await pool.query<RowDataPacket[]>(
+    `${SELECT_LOG}${where} ORDER BY l.fecha DESC, l.id DESC LIMIT ? OFFSET ?`,
+    [...parametros, paginacion.limite, desplazamiento],
+  );
+
+  return {
+    items: filas as LogAuditoria[],
+    total: Number(conteo[0].total),
+    pagina: paginacion.pagina,
+    limite: paginacion.limite,
+  };
 }
