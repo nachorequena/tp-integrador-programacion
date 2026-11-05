@@ -75,12 +75,34 @@ function instalarDependencias() {
 
 // ── 2. Archivo .env ────────────────────────────────────────────────────────
 
-/** Lee un .env simple (CLAVE=valor por línea) a un objeto. */
+/** Variables sin las que el backend no arranca (ver `src/config/env.ts`). */
+const OBLIGATORIAS = ["DB_HOST", "DB_USER", "DB_NAME", "JWT_SECRET"];
+
+/**
+ * Lee el .env a un objeto, con los mismos valores por defecto que
+ * `src/config/env.ts` para las variables opcionales.
+ *
+ * Se interpreta con `dotenv.parse`, la MISMA función que usa el backend al
+ * arrancar: comillas, comentarios y espacios se entienden exactamente igual.
+ * Si el script y el backend leyeran distinto una contraseña, uno se conectaría
+ * y el otro no. (`dotenv` ya está instalado: este paso corre después del
+ * `npm install`.)
+ *
+ * @throws Error si falta alguna variable obligatoria, con su nombre.
+ */
 function leerEnv() {
-  const valores = {};
-  for (const linea of fs.readFileSync(ARCHIVO_ENV, "utf8").split(/\r?\n/)) {
-    const coincidencia = linea.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);
-    if (coincidencia) valores[coincidencia[1]] = coincidencia[2];
+  const leidos = require("dotenv").parse(fs.readFileSync(ARCHIVO_ENV, "utf8"));
+  const valores = { PORT: "3000", DB_PORT: "3306", DB_PASSWORD: "" };
+  for (const [clave, valor] of Object.entries(leidos)) {
+    // Una variable opcional vacía conserva su valor por defecto (igual que el backend).
+    if (valor !== "" || !(clave in valores)) valores[clave] = valor;
+  }
+  const faltantes = OBLIGATORIAS.filter((clave) => !valores[clave]);
+  if (faltantes.length > 0) {
+    throw new Error(
+      `Al .env le faltan estas variables obligatorias: ${faltantes.join(", ")}. ` +
+        "Usá .env.example como modelo (o borrá el .env y el script lo crea solo).",
+    );
   }
   return valores;
 }
