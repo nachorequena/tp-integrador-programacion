@@ -9,6 +9,11 @@
  * aceptación pide justamente eso —"sin código repetido en cada endpoint"—, así
  * que si algún día aparece un `registrarLog` dentro de un controller, es señal
  * de que algo se hizo mal.
+ *
+ * Con qué se conecta: `registrarLog` lo llama SOLO `middlewares/auditoria.ts`;
+ * `listarLogs` lo llama `controllers/auditoria.controller.ts` (`GET
+ * /auditoria`, pantalla de auditoría del frontend). Tablas: `log_auditoria` y
+ * `usuario`.
  */
 
 import { ResultSetHeader, RowDataPacket } from "mysql2";

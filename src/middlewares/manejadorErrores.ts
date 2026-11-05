@@ -15,6 +15,10 @@
  * de la función para saber que es un manejador de errores. Si se borrara
  * `_next` por "no usarlo", Express lo trataría como middleware común y nunca lo
  * invocaría ante un error.
+ *
+ * Con qué se conecta: lo monta `src/index.ts` al final de todo. Recibe lo que
+ * cualquier controller manda con `next(error)` (casi siempre un `ErrorHttp` de
+ * `utils/errorHttp.ts`) y responde con `utils/respuesta.ts`.
  */
 
 import { NextFunction, Request, Response } from "express";

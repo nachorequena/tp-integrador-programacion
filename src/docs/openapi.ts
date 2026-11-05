@@ -2,8 +2,10 @@
  * DOCUMENTACIÓN DE LA API (OpenAPI 3)
  * ===================================
  *
- * Especificación completa de los 37 endpoints construidos en las cuatro
- * semanas de backend. La sirve `swagger-ui-express` en `GET /docs`.
+ * Especificación completa de los endpoints de la API: los 37 de las cuatro
+ * semanas de backend más los que agregó la etapa del frontend (médicos,
+ * disponibilidad, pacientes y usuarios). La sirve `swagger-ui-express` en
+ * `GET /docs` (ver `src/index.ts`).
  *
  * El criterio de aceptación pide que "alguien que no participó del desarrollo
  * entienda cómo consumir cada endpoint sin leer el código fuente". Por eso cada
@@ -22,6 +24,10 @@
  * (`exito`, `errores`, `rango`). Los esquemas de las entidades viven en
  * `components.schemas` y se referencian con `$ref`, así un cambio en una
  * entidad se hace en un solo lugar.
+ *
+ * Con qué se conecta: lo importa `src/index.ts`, que lo sirve con
+ * `swagger-ui-express` en `GET /docs`. Hay que actualizarlo cada vez que se
+ * agrega o cambia un endpoint en `routes/`.
  */
 
 /** Referencia a un esquema declarado en `components.schemas`. */
@@ -128,6 +134,39 @@ const rango = [
   },
 ];
 
+/** Parámetros de query `pagina` y `limite` de los listados paginados. */
+const paginacion = [
+  {
+    name: "pagina",
+    in: "query",
+    required: false,
+    schema: { type: "integer", minimum: 1, default: 1 },
+  },
+  {
+    name: "limite",
+    in: "query",
+    required: false,
+    schema: { type: "integer", minimum: 1, maximum: 50, default: 10 },
+  },
+];
+
+/**
+ * Esquema de una respuesta paginada: `{ items, total, pagina, limite }`.
+ *
+ * @param esquema Nombre del esquema de cada fila.
+ */
+function pagina(esquema: string) {
+  return {
+    type: "object",
+    properties: {
+      items: { type: "array", items: ref(esquema) },
+      total: { type: "integer", example: 35 },
+      pagina: { type: "integer", example: 1 },
+      limite: { type: "integer", example: 10 },
+    },
+  };
+}
+
 /** Cuerpo JSON obligatorio con el esquema indicado. */
 function cuerpo(nombreEsquema: string) {
   return {
@@ -145,7 +184,7 @@ export const especificacion = {
   openapi: "3.0.3",
   info: {
     title: "API — Sistema de Gestión de Turnos Médicos",
-    version: "4.0.0",
+    version: "5.0.0",
     description: [
       "TP Integrador de Programación 2. Backend de una clínica: usuarios, agenda",
       "médica, turnos, historial clínico, notificaciones, auditoría y reportes.",
@@ -182,6 +221,15 @@ export const especificacion = {
       "Las altas, bajas y modificaciones sobre usuarios, sedes, especialidades,",
       "coberturas, agendas y turnos se registran solas en `log_auditoria`. No hay",
       "endpoint para crearlas: se consultan con `GET /auditoria`.",
+      "",
+      "## Etapa frontend",
+      "",
+      "Para la entrega final del frontend se sumaron `GET /medicos`,",
+      "`GET /disponibilidad/fechas`, `GET /disponibilidad/horarios`,",
+      "`GET/POST /pacientes`, `PUT /pacientes/mis-datos` y `GET/POST/PUT /usuarios`;",
+      "`GET /sedes` y `GET /especialidades` quedaron abiertos a cualquier usuario",
+      "con sesión, y se ajustaron las reglas de agenda, turnos y auditoría (ver",
+      "cada operación).",
     ].join("\n"),
   },
   servers: [{ url: "http://localhost:3000", description: "Entorno local" }],
@@ -197,6 +245,10 @@ export const especificacion = {
     { name: "Notificaciones", description: "Avisos automáticos (semana 3)" },
     { name: "Auditoría", description: "Log de acciones sensibles (semana 4)" },
     { name: "Reportes", description: "Estadísticas para administración (semana 4)" },
+    { name: "Médicos", description: "Listado de médicos con especialidades (etapa frontend)" },
+    { name: "Disponibilidad", description: "Fechas y horarios libres (etapa frontend)" },
+    { name: "Pacientes", description: "Búsqueda, alta y mis datos (etapa frontend)" },
+    { name: "Usuarios", description: "Gestión de usuarios del administrador (etapa frontend)" },
   ],
   components: {
     securitySchemes: {
@@ -329,6 +381,12 @@ export const especificacion = {
           medico: { type: "string", example: "Lopez, Ana" },
           especialidad: { type: "string", example: "Traumatologia" },
           sede: { type: "string", example: "Sede Centro" },
+          turnos_confirmados: {
+            type: "integer",
+            example: 1,
+            description: "Si es mayor que 0, la baja se rechaza con 409.",
+          },
+          turnos_totales: { type: "integer", example: 2 },
         },
       },
       DatosAgenda: {
@@ -362,6 +420,113 @@ export const especificacion = {
           id_cobertura: { type: "integer", example: 1 },
           estado: { type: "string", enum: ["confirmado", "cancelado", "atendido"] },
         },
+      },
+      TurnoDetallado: {
+        description:
+          "Turno con los nombres resueltos y, si fue atendido, el resumen del " +
+          "historial clínico. Es lo que devuelven los listados y las acciones " +
+          "sobre turnos desde la etapa frontend.",
+        allOf: [
+          ref("Turno"),
+          {
+            type: "object",
+            properties: {
+              id_medico: { type: "integer", example: 3 },
+              id_especialidad: { type: "integer", example: 1 },
+              id_sede: { type: "integer", example: 1 },
+              medico: { type: "string", example: "Lopez, Ana" },
+              especialidad: { type: "string", example: "Traumatologia" },
+              sede: { type: "string", example: "Sede Centro" },
+              paciente: { type: "string", example: "Friggeri, Franco" },
+              dni_paciente: { type: "string", example: "36000960" },
+              fecha_nacimiento_paciente: { type: "string", format: "date" },
+              cobertura: { type: "string", example: "Jerarquicos" },
+              diagnostico: { type: "string", nullable: true },
+              tratamiento: { type: "string", nullable: true },
+              observaciones: { type: "string", nullable: true },
+            },
+          },
+        ],
+      },
+      Medico: {
+        type: "object",
+        description: "Médico sin datos personales más allá del nombre.",
+        properties: {
+          id: { type: "integer", example: 3 },
+          nombre: { type: "string", example: "Ana" },
+          apellido: { type: "string", example: "Lopez" },
+          id_sede: { type: "integer", nullable: true, example: 1 },
+          especialidades: { type: "array", items: ref("Especialidad") },
+        },
+      },
+      HorarioLibre: {
+        type: "object",
+        properties: {
+          hora: { type: "string", example: "09:30" },
+          id_agenda: { type: "integer", example: 4 },
+        },
+      },
+      PacienteEncontrado: {
+        type: "object",
+        properties: {
+          id: { type: "integer", example: 2 },
+          nombre: { type: "string", example: "Franco" },
+          apellido: { type: "string", example: "Friggeri" },
+          dni: { type: "string", example: "36000960" },
+          fecha_nacimiento: { type: "string", format: "date" },
+          id_cobertura: { type: "integer", nullable: true, example: 1 },
+          cobertura: { type: "string", nullable: true, example: "Jerarquicos" },
+        },
+      },
+      DatosMisDatos: {
+        type: "object",
+        required: ["email", "telefono", "id_cobertura"],
+        description: "Únicos campos que el paciente puede modificar. Cualquier otro → 400.",
+        properties: {
+          email: { type: "string", maxLength: 30, example: "ffriggeri@mail.com" },
+          telefono: { type: "string", maxLength: 10, example: "3425000000" },
+          id_cobertura: { type: "integer", example: 2 },
+          password: {
+            type: "string",
+            minLength: 6,
+            description: "Opcional: si no viene, se conserva la actual.",
+          },
+        },
+      },
+      DatosUsuarioAdmin: {
+        type: "object",
+        required: ["nombre", "apellido", "dni", "email", "telefono", "fecha_nacimiento", "rol"],
+        description:
+          "Alta: `rol` ∈ admin/operador/medico y `password` obligatoria. Edición: " +
+          "cualquier rol (no se puede cambiar el que tiene) y `password` opcional. " +
+          "`id_sede` obligatorio para operador y médico; `especialidades` (al " +
+          "menos una) para médico; `id_cobertura` para paciente.",
+        properties: {
+          nombre: { type: "string", maxLength: 30 },
+          apellido: { type: "string", maxLength: 30 },
+          dni: { type: "string", example: "30111222" },
+          email: { type: "string", maxLength: 30 },
+          telefono: { type: "string", maxLength: 10 },
+          fecha_nacimiento: { type: "string", format: "date" },
+          rol: { type: "string", enum: ["admin", "operador", "medico", "paciente"] },
+          password: { type: "string", minLength: 6 },
+          id_sede: { type: "integer", nullable: true },
+          id_cobertura: { type: "integer", nullable: true },
+          especialidades: { type: "array", items: { type: "integer" }, example: [1, 2] },
+        },
+      },
+      UsuarioListado: {
+        allOf: [
+          ref("Usuario"),
+          {
+            type: "object",
+            properties: {
+              sede: { type: "string", nullable: true, example: "Sede Centro" },
+              cobertura: { type: "string", nullable: true },
+              especialidades: { type: "array", items: { type: "integer" } },
+            },
+          },
+        ],
       },
       DatosNuevoTurno: {
         type: "object",
@@ -640,7 +805,10 @@ export const especificacion = {
       get: {
         tags: ["Sedes"],
         summary: "Listado",
-        description: "**Rol:** `admin`.",
+        description:
+          "**Rol:** cualquier usuario con sesión (desde la etapa frontend: lo " +
+          "usan los selectores de sede de todos los roles). Alta, modificación y " +
+          "baja siguen siendo solo `admin`.",
         security: [{ bearerAuth: [] }],
         responses: {
           ...exito(200, "Sedes", { type: "array", items: ref("Sede") }),
@@ -699,7 +867,9 @@ export const especificacion = {
       get: {
         tags: ["Especialidades"],
         summary: "Listado",
-        description: "**Rol:** `admin`.",
+        description:
+          "**Rol:** cualquier usuario con sesión (etapa frontend). Alta, " +
+          "modificación y baja siguen siendo solo `admin`.",
         security: [{ bearerAuth: [] }],
         responses: {
           ...exito(200, "Especialidades", { type: "array", items: ref("Especialidad") }),
@@ -792,7 +962,9 @@ export const especificacion = {
         tags: ["Agenda"],
         summary: "Alta de un rango horario",
         description:
-          "**Rol:** `medico` (solo con su propio `id_medico`), `operador`, `admin`.\n\n" +
+          "**Rol:** `medico` (solo con su propio `id_medico`), `operador` (solo en " +
+          "su sede, desde la etapa frontend), `admin`.\n\n" +
+          "El médico tiene que tener asignada la especialidad (400 si no).\n\n" +
           "Auditado como `ALTA` de `agenda`. Se rechaza con **409** si el rango " +
           "pisa otro del mismo médico en la misma fecha. Varios rangos por día " +
           "están permitidos mientras no se solapen; los contiguos se aceptan.",
@@ -802,7 +974,7 @@ export const especificacion = {
           ...exito(201, "Agenda creada", ref("Agenda")),
           ...errores(
             [400, "Datos inválidos, o el id_medico no corresponde a un médico"],
-            [403, "Un médico solo puede crear agenda para sí mismo"],
+            [403, "Un médico solo puede crear agenda para sí mismo / el operador solo en su sede"],
             [409, "El médico ya tiene una agenda de 08:00 a 12:00 esa fecha"],
             [401, "Falta el token, está vencido o es inválido"],
             [500, "Error interno del servidor"],
@@ -815,10 +987,12 @@ export const especificacion = {
         tags: ["Agenda"],
         summary: "Modificación",
         description:
-          "**Rol:** `medico` (solo la propia), `operador`, `admin`.\n\n" +
+          "**Rol:** `medico` (solo la propia), `operador` (solo su sede), `admin`.\n\n" +
           "Auditado como `MODIFICACION` de `agenda`. La pertenencia se controla " +
-          "dos veces: sobre la fila existente, para que un médico no edite la de " +
-          "otro, y sobre los datos nuevos, para que no se la reasigne a un colega.",
+          "dos veces: sobre la fila existente y sobre los datos nuevos.\n\n" +
+          "Si el rango tiene turnos **confirmados**, responde **409** si el nuevo " +
+          "horario deja alguno afuera o si se cambia fecha, médico, especialidad " +
+          "o sede.",
         security: [{ bearerAuth: [] }],
         parameters: [paramId("id", "Id de la agenda")],
         requestBody: cuerpo("DatosAgenda"),
@@ -828,7 +1002,7 @@ export const especificacion = {
             [400, "Datos inválidos"],
             [403, "Solo podés gestionar tu propia agenda"],
             [404, "La agenda indicada no existe"],
-            [409, "El rango se solapa con otro del mismo médico"],
+            [409, "El rango se solapa con otro, o deja turnos confirmados afuera"],
             [401, "Falta el token, está vencido o es inválido"],
             [500, "Error interno del servidor"],
           ),
@@ -838,9 +1012,10 @@ export const especificacion = {
         tags: ["Agenda"],
         summary: "Baja",
         description:
-          "**Rol:** `medico` (solo la propia), `operador`, `admin`.\n\n" +
-          "Auditado como `BAJA` de `agenda`. Se valida que no tenga turnos " +
-          "asociados; si los tiene responde **409**, nunca un 500.",
+          "**Rol:** `medico` (solo la propia), `operador` (solo su sede), `admin`.\n\n" +
+          "Auditado como `BAJA` de `agenda`. Con turnos confirmados responde " +
+          "**409** (hay que cancelarlos primero); con turnos atendidos o " +
+          "cancelados también, para conservar el historial. Nunca un 500.",
         security: [{ bearerAuth: [] }],
         parameters: [paramId("id", "Id de la agenda")],
         responses: {
@@ -848,7 +1023,7 @@ export const especificacion = {
           ...errores(
             [403, "Solo podés gestionar tu propia agenda"],
             [404, "La agenda indicada no existe"],
-            [409, "No se puede eliminar: tiene 2 turnos asignados"],
+            [409, "No se puede eliminar el rango porque tiene 2 turno(s) confirmado(s)"],
             [401, "Falta el token, está vencido o es inválido"],
             [500, "Error interno del servidor"],
           ),
@@ -867,23 +1042,21 @@ export const especificacion = {
           "Auditado como `ALTA` de `turno`. El turno se crea en estado " +
           "`confirmado` y genera una notificación para el paciente.\n\n" +
           "La cobertura se toma de la registrada por el paciente y **no puede " +
-          "pisarse** desde este endpoint. El horario debe caer dentro de un rango " +
-          "de la agenda del médico y no coincidir con otro turno confirmado.",
+          "pisarse** desde este endpoint.\n\n" +
+          "Desde la etapa frontend: el horario tiene que ser futuro, caer en la " +
+          "grilla de 30 minutos de un rango de la agenda (los mismos horarios que " +
+          "ofrece `GET /disponibilidad/horarios`) y no estar tomado. El alta es " +
+          "transaccional: si dos pedidos llegan al mismo horario, el segundo " +
+          "recibe 409. Notifica al paciente, al médico y al operador si fue él.",
         security: [{ bearerAuth: [] }],
         requestBody: cuerpo("DatosNuevoTurno"),
         responses: {
-          ...exito(201, "Turno confirmado", {
-            type: "object",
-            properties: {
-              id: { type: "integer", example: 5 },
-              mensaje: { type: "string", example: "Turno confirmado correctamente" },
-            },
-          }),
+          ...exito(201, "Turno confirmado (detallado, con `mensaje`)", ref("TurnoDetallado")),
           ...errores(
             [400, "El horario solicitado no está disponible en la agenda del médico"],
             [403, "El operador solo puede solicitar turnos de su propia sede"],
             [404, "Paciente no encontrado"],
-            [409, "Ya existe un turno confirmado para ese horario"],
+            [409, "Ese horario ya fue tomado por otro paciente. Elegí otro horario."],
             [401, "Falta el token, está vencido o es inválido"],
             [500, "Error interno del servidor"],
           ),
@@ -900,7 +1073,10 @@ export const especificacion = {
           "token: no hay forma de pedir los turnos de otro.",
         security: [{ bearerAuth: [] }],
         responses: {
-          ...exito(200, "Turnos del paciente", { type: "array", items: ref("Turno") }),
+          ...exito(200, "Turnos del paciente: primero los próximos, después los pasados", {
+            type: "array",
+            items: ref("TurnoDetallado"),
+          }),
           ...errores(...ERRORES_ROL),
         },
       },
@@ -909,7 +1085,9 @@ export const especificacion = {
       get: {
         tags: ["Turnos"],
         summary: "Turnos programados del médico para una fecha",
-        description: "**Rol:** `medico`. El médico sale del token.",
+        description:
+          "**Rol:** `medico`. El médico sale del token. Sin `id_sede`, trae los " +
+          "turnos de todas las sedes donde atiende ese día.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -918,9 +1096,10 @@ export const especificacion = {
             required: true,
             schema: { type: "string", format: "date", example: "2025-10-20" },
           },
+          { name: "id_sede", in: "query", required: false, schema: { type: "integer" } },
         ],
         responses: {
-          ...exito(200, "Turnos del día", { type: "array", items: ref("Turno") }),
+          ...exito(200, "Turnos del día", { type: "array", items: ref("TurnoDetallado") }),
           ...errores([400, "La fecha es obligatoria"], ...ERRORES_ROL),
         },
       },
@@ -929,7 +1108,9 @@ export const especificacion = {
       get: {
         tags: ["Turnos"],
         summary: "Turnos de la sede para una fecha",
-        description: "**Rol:** `operador`. La sede sale del token.",
+        description:
+          "**Rol:** `operador`. La sede sale del token. `id_medico` opcional " +
+          "filtra los de un médico (lo usa el ícono de \"ojo\" de la agenda).",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -938,9 +1119,10 @@ export const especificacion = {
             required: true,
             schema: { type: "string", format: "date", example: "2025-10-20" },
           },
+          { name: "id_medico", in: "query", required: false, schema: { type: "integer" } },
         ],
         responses: {
-          ...exito(200, "Turnos de la sede", { type: "array", items: ref("Turno") }),
+          ...exito(200, "Turnos de la sede", { type: "array", items: ref("TurnoDetallado") }),
           ...errores(
             [400, "La fecha es obligatoria"],
             [403, "El usuario no tiene una sede asignada"],
@@ -955,8 +1137,9 @@ export const especificacion = {
         tags: ["Turnos"],
         summary: "Cancelar un turno",
         description:
-          "**Rol:** `paciente` (solo el suyo), `operador` y `medico` (solo los " +
-          "de su sede; el médico además solo los suyos).\n\n" +
+          "**Rol:** `paciente` (solo el suyo), `operador` (solo los de su sede) " +
+          "y `medico` (solo los suyos, en cualquier sede donde atienda: la " +
+          "restricción de sede de la semana 3 se reemplazó en la etapa frontend).\n\n" +
           "Auditado como `BAJA` de `turno`. Pasa el estado a `cancelado` y genera " +
           "una notificación para el paciente. Solo se cancelan turnos " +
           "`confirmado`: uno ya cancelado o atendido responde 400.\n\n" +
@@ -964,12 +1147,7 @@ export const especificacion = {
         security: [{ bearerAuth: [] }],
         parameters: [paramId("id", "Id del turno")],
         responses: {
-          ...exito(200, "Turno cancelado", {
-            type: "object",
-            properties: {
-              mensaje: { type: "string", example: "Turno cancelado correctamente" },
-            },
-          }),
+          ...exito(200, "Turno cancelado (detallado, con `mensaje`)", ref("TurnoDetallado")),
           ...errores(
             [400, "Solo se pueden cancelar turnos confirmados"],
             [403, "No podés cancelar un turno de otro paciente"],
@@ -985,19 +1163,21 @@ export const especificacion = {
         tags: ["Turnos"],
         summary: "Marcar un turno como atendido",
         description:
-          "**Rol:** `medico`, y solo sobre sus propios turnos.\n\n" +
+          "**Rol:** `medico`, y solo sobre sus propios turnos (en cualquier sede).\n\n" +
           "Auditado como `MODIFICACION` de `turno`. Pasa el estado a `atendido` y " +
-          "genera una notificación. La carga del historial clínico es un paso " +
-          "posterior: ver `POST /historial/{idTurno}`.",
+          "genera notificaciones.\n\n" +
+          "El cuerpo es **opcional**: si trae `diagnostico` (más `tratamiento` y " +
+          "`observaciones` opcionales), el historial clínico se guarda en la " +
+          "misma transacción. Sin cuerpo, el historial se puede cargar después " +
+          "con `POST /historial/{idTurno}`.",
         security: [{ bearerAuth: [] }],
         parameters: [paramId("id", "Id del turno")],
+        requestBody: {
+          required: false,
+          content: { "application/json": { schema: ref("DatosHistorial") } },
+        },
         responses: {
-          ...exito(200, "Turno atendido", {
-            type: "object",
-            properties: {
-              mensaje: { type: "string", example: "Turno marcado como atendido" },
-            },
-          }),
+          ...exito(200, "Turno atendido (detallado, con el historial)", ref("TurnoDetallado")),
           ...errores(
             [400, "Solo se pueden atender turnos confirmados"],
             [403, "El médico solo puede atender sus propios turnos"],
@@ -1130,8 +1310,10 @@ export const especificacion = {
         summary: "Consultar el log de acciones sensibles",
         description:
           "**Rol:** `admin`.\n\n" +
-          "Los cuatro filtros son opcionales y se combinan con AND. El rango de " +
-          "fechas es inclusivo en los dos extremos.\n\n" +
+          "Los filtros son opcionales y se combinan con AND. El rango de " +
+          "fechas es inclusivo en los dos extremos. Desde la etapa frontend la " +
+          "respuesta es **paginada** (`pagina`, `limite`, máx. 50) y suma el " +
+          "filtro de texto `usuario` (apellido, nombre o DNI).\n\n" +
           "Las entradas las escribe automáticamente un middleware ante cada alta, " +
           "baja o modificación sobre `usuario`, `sede`, `especialidad`, " +
           "`cobertura`, `agenda` y `turno`. No existe endpoint para crearlas, " +
@@ -1146,6 +1328,13 @@ export const especificacion = {
             description: "Quién realizó la acción.",
           },
           {
+            name: "usuario",
+            in: "query",
+            required: false,
+            schema: { type: "string" },
+            description: "Apellido, nombre o DNI de quien realizó la acción.",
+          },
+          {
             name: "entidad",
             in: "query",
             required: false,
@@ -1155,12 +1344,14 @@ export const especificacion = {
             },
           },
           ...rango,
+          ...paginacion,
         ],
         responses: {
-          ...exito(200, "Entradas del log, de la más reciente a la más antigua", {
-            type: "array",
-            items: ref("LogAuditoria"),
-          }),
+          ...exito(
+            200,
+            "Página del log, de la entrada más reciente a la más antigua",
+            pagina("LogAuditoria"),
+          ),
           ...errores([400, "Algún filtro tiene formato inválido"], ...ERRORES_ROL),
         },
       },
@@ -1236,6 +1427,197 @@ export const especificacion = {
         responses: {
           ...exito(200, "Tasa de cancelación", ref("TasaCancelacion")),
           ...errores([400, "desde no puede ser posterior a hasta"], ...ERRORES_ROL),
+        },
+      },
+    },
+
+    // ── Etapa frontend ──────────────────────────────────────────────────────
+    "/medicos": {
+      get: {
+        tags: ["Médicos"],
+        summary: "Médicos con sus especialidades",
+        description:
+          "**Rol:** cualquier usuario con sesión.\n\n" +
+          "Solo nombre, apellido, sede y especialidades (sin otros datos " +
+          "personales). Filtros opcionales: `id_especialidad` (tiene esa " +
+          "especialidad) e `id_sede` (es su sede o tiene agenda desde hoy en esa sede).",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id_especialidad", in: "query", required: false, schema: { type: "integer" } },
+          { name: "id_sede", in: "query", required: false, schema: { type: "integer" } },
+        ],
+        responses: {
+          ...exito(200, "Médicos", { type: "array", items: ref("Medico") }),
+          ...errores([400, "Algún filtro tiene formato inválido"], ...ERRORES_AUTH),
+        },
+      },
+    },
+    "/disponibilidad/fechas": {
+      get: {
+        tags: ["Disponibilidad"],
+        summary: "Fechas con agenda y algún horario libre",
+        description:
+          "**Rol:** `paciente`, `operador`.\n\n" +
+          "Desde hoy en adelante, para un médico, una especialidad y una sede. No " +
+          "devuelve datos de otros pacientes.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id_medico", in: "query", required: true, schema: { type: "integer" } },
+          { name: "id_especialidad", in: "query", required: true, schema: { type: "integer" } },
+          { name: "id_sede", in: "query", required: true, schema: { type: "integer" } },
+        ],
+        responses: {
+          ...exito(200, "Fechas YYYY-MM-DD", {
+            type: "array",
+            items: { type: "string", format: "date" },
+          }),
+          ...errores([400, "Falta algún parámetro"], ...ERRORES_ROL),
+        },
+      },
+    },
+    "/disponibilidad/horarios": {
+      get: {
+        tags: ["Disponibilidad"],
+        summary: "Horarios libres de una fecha",
+        description:
+          "**Rol:** `paciente`, `operador`.\n\n" +
+          "Rangos de agenda del médico en esa especialidad, sede y fecha, " +
+          "partidos en turnos de **30 minutos**, menos los turnos confirmados y " +
+          "los horarios que ya pasaron. Son exactamente los que acepta `POST /turnos`.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id_medico", in: "query", required: true, schema: { type: "integer" } },
+          { name: "id_especialidad", in: "query", required: true, schema: { type: "integer" } },
+          { name: "id_sede", in: "query", required: true, schema: { type: "integer" } },
+          {
+            name: "fecha",
+            in: "query",
+            required: true,
+            schema: { type: "string", format: "date" },
+          },
+        ],
+        responses: {
+          ...exito(200, "Horarios libres", { type: "array", items: ref("HorarioLibre") }),
+          ...errores([400, "Falta algún parámetro o la fecha no es válida"], ...ERRORES_ROL),
+        },
+      },
+    },
+    "/pacientes": {
+      get: {
+        tags: ["Pacientes"],
+        summary: "Buscar pacientes por DNI o apellido",
+        description:
+          "**Rol:** `operador`, `medico`, `admin`.\n\n" +
+          "`busqueda` (mín. 2 caracteres) coincide con el principio del DNI o " +
+          "con cualquier parte del apellido. Máximo 20 resultados.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "busqueda", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          ...exito(200, "Pacientes", { type: "array", items: ref("PacienteEncontrado") }),
+          ...errores([400, "busqueda debe tener al menos 2 caracteres"], ...ERRORES_ROL),
+        },
+      },
+      post: {
+        tags: ["Pacientes"],
+        summary: "Alta de paciente por el operador",
+        description:
+          "**Rol:** `operador`. Mismos datos y validaciones que `POST /auth/registro`. " +
+          "Auditado como `ALTA` de `usuario` (actor: el operador).",
+        security: [{ bearerAuth: [] }],
+        requestBody: cuerpo("DatosRegistro"),
+        responses: {
+          ...exito(201, "Paciente creado", ref("Usuario")),
+          ...errores(
+            [400, "Datos inválidos o la cobertura no existe"],
+            [409, "El DNI ya está registrado"],
+            ...ERRORES_ROL,
+          ),
+        },
+      },
+    },
+    "/pacientes/mis-datos": {
+      put: {
+        tags: ["Pacientes"],
+        summary: "El paciente modifica sus datos",
+        description:
+          "**Rol:** `paciente`. Solo email, contraseña (opcional, se guarda " +
+          "hasheada), teléfono y cobertura. Auditado como `MODIFICACION` de `usuario`.",
+        security: [{ bearerAuth: [] }],
+        requestBody: cuerpo("DatosMisDatos"),
+        responses: {
+          ...exito(200, "Datos actualizados", ref("Usuario")),
+          ...errores(
+            [400, "Solo se pueden modificar email, password, telefono e id_cobertura"],
+            [409, "El email ya está registrado por otro usuario"],
+            ...ERRORES_ROL,
+          ),
+        },
+      },
+    },
+    "/usuarios": {
+      get: {
+        tags: ["Usuarios"],
+        summary: "Listado paginado de usuarios",
+        description:
+          "**Rol:** `admin`. Filtros opcionales: `nombre` y `apellido` (coincidencia " +
+          "parcial), `rol` e `id_sede`.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "nombre", in: "query", required: false, schema: { type: "string" } },
+          { name: "apellido", in: "query", required: false, schema: { type: "string" } },
+          {
+            name: "rol",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["admin", "operador", "medico", "paciente"] },
+          },
+          { name: "id_sede", in: "query", required: false, schema: { type: "integer" } },
+          ...paginacion,
+        ],
+        responses: {
+          ...exito(200, "Página de usuarios", pagina("UsuarioListado")),
+          ...errores([400, "Algún filtro tiene formato inválido"], ...ERRORES_ROL),
+        },
+      },
+      post: {
+        tags: ["Usuarios"],
+        summary: "Alta de operador, médico o administrador",
+        description:
+          "**Rol:** `admin`. Auditado como `ALTA` de `usuario`. Operador y médico " +
+          "con sede; administrador sin sede; médico con una o más especialidades.",
+        security: [{ bearerAuth: [] }],
+        requestBody: cuerpo("DatosUsuarioAdmin"),
+        responses: {
+          ...exito(201, "Usuario creado", ref("UsuarioListado")),
+          ...errores(
+            [400, "Datos inválidos, rol no permitido o referencia inexistente"],
+            [409, "El DNI o el email ya están registrados"],
+            ...ERRORES_ROL,
+          ),
+        },
+      },
+    },
+    "/usuarios/{id}": {
+      put: {
+        tags: ["Usuarios"],
+        summary: "Edición de cualquier usuario",
+        description:
+          "**Rol:** `admin`. Auditado como `MODIFICACION` de `usuario`. El rol no " +
+          "se puede cambiar; la contraseña vacía se conserva; no se puede quitar " +
+          "a un médico una especialidad en la que tiene agenda (409).",
+        security: [{ bearerAuth: [] }],
+        parameters: [paramId("id", "Id del usuario")],
+        requestBody: cuerpo("DatosUsuarioAdmin"),
+        responses: {
+          ...exito(200, "Usuario actualizado", ref("UsuarioListado")),
+          ...errores(
+            [400, "Datos inválidos o cambio de rol"],
+            [404, "El usuario indicado no existe"],
+            [409, "DNI/email duplicado o especialidad con agenda"],
+            ...ERRORES_ROL,
+          ),
         },
       },
     },

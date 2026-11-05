@@ -12,6 +12,10 @@
  * dos vistas distintas del mismo dato. Separarlas permite que el destinatario
  * salga siempre del token: ni el paciente ni el médico pueden pedir el
  * historial de otro cambiando un número en la URL.
+ *
+ * Con qué se conecta: lo monta `routes/index.ts` en `/historial`; delega en
+ * `controllers/historial.controller.ts`. Lo consumen "Mi historial clínico"
+ * (paciente) e "Historial de pacientes" (médico) del frontend.
  */
 
 import { Router } from "express";

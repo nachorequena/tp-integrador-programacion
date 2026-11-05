@@ -25,6 +25,10 @@
  *
  * Nota de alcance: de la tabla `turno` (semana 3+) solo se hace un `SELECT` de
  * existencia. No se implementa ninguna funcionalidad de turnos.
+ *
+ * Con qué se conecta: lo usan `sede.service.ts`, `especialidad.service.ts` y
+ * `cobertura.service.ts` antes de un DELETE, para responder 409 en vez de
+ * dejar que la base falle con un 500.
  */
 
 import { RowDataPacket } from "mysql2";

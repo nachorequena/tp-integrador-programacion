@@ -14,6 +14,9 @@
  * Todos los reportes cuelgan de `turno`, y `turno` no guarda ni el médico ni la
  * sede ni la especialidad: los hereda del rango de agenda al que pertenece. De
  * ahí que todas las consultas hagan `JOIN agenda`.
+ *
+ * Con qué se conecta: lo llama `controllers/reporte.controller.ts`. Tablas:
+ * `turno`, `agenda`, `especialidad`, `sede` y `usuario` (solo lectura).
  */
 
 import { RowDataPacket } from "mysql2";

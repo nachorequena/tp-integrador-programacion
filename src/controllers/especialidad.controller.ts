@@ -3,6 +3,11 @@
  * ========================
  *
  * CRUD de especialidades médicas. Todas las rutas son solo para el rol `admin`.
+ *
+ * Con qué se conecta: `routes/especialidad.routes.ts` → este controller →
+ * `validators/entidades.validators.ts` y `services/especialidad.service.ts`.
+ * Lo consumen la pantalla de especialidades del administrador y los selectores
+ * de especialidad del frontend.
  */
 
 import { NextFunction, Request, Response } from "express";

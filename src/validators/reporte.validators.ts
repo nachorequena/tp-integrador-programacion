@@ -7,6 +7,9 @@
  * La consigna pide que "todos los indicadores puedan filtrarse por rango de
  * fechas", así que la validación es una sola y se reutiliza en los cuatro
  * endpoints: si mañana cambia el formato, se toca en un solo lugar.
+ *
+ * Con qué se conecta: lo usa `controllers/reporte.controller.ts`; reutiliza
+ * `validarExtremo` de `auditoria.validators.ts`.
  */
 
 import { RangoFechas } from "../types";

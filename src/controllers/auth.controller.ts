@@ -18,6 +18,12 @@
  * error: se la pasa a `next(error)`, que la manda al middleware
  * `manejadorErrores`. Así el código de error se decide en un solo lugar y los
  * controllers solo se ocupan del camino feliz.
+ *
+ * Con qué se conecta: lo llama `routes/auth.routes.ts` (registro, login,
+ * perfil). Usa `validators/auth.validators.ts` y `services/auth.service.ts`.
+ * Lo consumen las pantallas de login, registro y perfil del frontend. El alta
+ * de pacientes del operador (`paciente.controller.ts`) reutiliza el mismo
+ * validator y service.
  */
 
 import { NextFunction, Request, Response } from "express";

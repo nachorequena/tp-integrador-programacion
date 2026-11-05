@@ -1,9 +1,15 @@
 # TP Integrador — Sistema de Gestión de Turnos Médicos (Backend)
 
-Programación 2 — Etapa backend.
+Programación 2 — API de la clínica que consume el frontend Angular
+([tp-integrador-frontend](https://github.com/nachorequena/tp-integrador-frontend)).
 
 - **Semana 1** ✅ — setup, conexión a la base y autenticación con JWT.
 - **Semana 2** ✅ — CRUD de sedes, especialidades, coberturas y agenda médica (rama `entrega-backend-2`).
+- **Semana 3** ✅ — turnos, historial clínico y notificaciones (rama `entrega-backend-3`).
+- **Semana 4** ✅ — auditoría, reportes y Swagger (rama `entrega-backend-4`).
+- **Entrega final del frontend** ✅ — ajustes de la API que pidió la consigna final del frontend (rama `entrega-frontend`). Ver [Cambios para el frontend](#cambios-para-el-frontend-entrega-final).
+
+> La guía completa para levantar **backend + frontend + base** desde cero, con los usuarios de prueba de los cuatro roles, está en el README del frontend. Este README cubre el backend.
 
 Stack: Node.js + Express 5 + TypeScript + MySQL/MariaDB (`mysql2` con SQL crudo, sin ORM), JWT y bcrypt.
 
@@ -34,6 +40,18 @@ mysql -u root -p clinica < scripts/usuarios-prueba.sql
 ```
 
 **Sin este paso no se puede probar casi nada.** Los cuatro usuarios que trae el script de la cátedra tienen hashes de contraseña falsos (`$2b$10$hashdeejemplo1`), así que ninguno puede iniciar sesión y sin sesión no hay forma de demostrar los permisos por rol. El script les pone contraseñas reales y agrega un segundo médico. Es idempotente y **no modifica el `.sql` de la cátedra**.
+
+### 2.b Cargar los datos de prueba de la entrega final
+
+```bash
+mysql -u root -p clinica < scripts/datos-prueba.sql
+```
+
+Deja la base como la pide la consigna final para la defensa: **tres médicos con distintas especialidades** (Traumatología, Clínica médica y Cardiología), **uno de ellos con agenda en dos sedes** (Ana Lopez: mañanas en Sede Centro, tardes en Sede Norte), **turnos en los tres estados** (confirmado, cancelado y atendido con su historial), un segundo paciente y dos coberturas más.
+
+Las fechas son **relativas al día en que se ejecuta** (`CURDATE()`): siempre hay agenda para hoy y los próximos días, que es lo que muestran por defecto las pantallas. Conviene correrlo el mismo día de la defensa. Es idempotente: correrlo dos veces el mismo día no duplica nada.
+
+> En Windows, si el cliente `mysql` no está en el PATH, usar el de WAMP (por ejemplo `C:\wamp64\bin\mysql\mysql8.3.0\bin\mysql.exe`) o importar los tres scripts **en orden** desde phpMyAdmin.
 
 ### 3. Configurar el entorno
 
@@ -120,11 +138,11 @@ Ejemplo de error:
 | Método | Ruta                      | Protección | Descripción                              |
 | ------ | ------------------------- | ---------- | ---------------------------------------- |
 | GET    | `/coberturas/disponibles` | **pública** | Listado de solo lectura para el registro |
-| GET    | `/sedes`                  | `admin`    | Listado                                  |
+| GET    | `/sedes`                  | cualquier sesión ¹ | Listado                          |
 | POST   | `/sedes`                  | `admin`    | Alta: `nombre`, `direccion`, `telefono`  |
 | PUT    | `/sedes/:id`              | `admin`    | Modificación                             |
 | DELETE | `/sedes/:id`              | `admin`    | Baja (valida dependencias)               |
-| GET    | `/especialidades`         | `admin`    | Listado                                  |
+| GET    | `/especialidades`         | cualquier sesión ¹ | Listado                          |
 | POST   | `/especialidades`         | `admin`    | Alta: `descripcion`                      |
 | PUT    | `/especialidades/:id`     | `admin`    | Modificación                             |
 | DELETE | `/especialidades/:id`     | `admin`    | Baja (valida dependencias)               |
@@ -133,16 +151,18 @@ Ejemplo de error:
 | PUT    | `/coberturas/:id`         | `admin`    | Modificación                             |
 | DELETE | `/coberturas/:id`         | `admin`    | Baja (valida dependencias)               |
 
+¹ Hasta la semana 4 eran solo `admin`. La consigna final del frontend pide que los listados de sedes y especialidades estén disponibles para cualquier usuario con sesión (los usan los selectores de todos los roles). Alta, modificación y baja siguen siendo solo `admin`.
+
 > **¿Por qué `/coberturas` y `/coberturas/disponibles`?** El criterio de aceptación exige que los endpoints de coberturas sean accesibles *únicamente* por admin (403 para el resto), pero la consigna también pide un servicio de solo lectura reutilizable desde el registro de pacientes, que es público y no lleva token. Las dos cosas no entran en la misma ruta. En la semana 1 el listado público era `/coberturas`; ahora es `/coberturas/disponibles`.
 
 ### Agenda médica (semana 2)
 
 | Método | Ruta           | Protección                     | Descripción                              |
 | ------ | -------------- | ------------------------------ | ---------------------------------------- |
-| GET    | `/agendas`     | `medico`, `operador`, `admin`  | Listado filtrable                        |
-| POST   | `/agendas`     | `medico`, `operador`, `admin`  | Alta de un rango horario                 |
-| PUT    | `/agendas/:id` | `medico`, `operador`, `admin`  | Modificación                             |
-| DELETE | `/agendas/:id` | `medico`, `operador`, `admin`  | Baja (valida turnos asociados)           |
+| GET    | `/agendas`     | `medico`, `operador`, `admin`  | Listado filtrable (trae `turnos_confirmados`) |
+| POST   | `/agendas`     | `medico` (propia), `operador` (su sede), `admin` | Alta de un rango horario |
+| PUT    | `/agendas/:id` | `medico` (propia), `operador` (su sede), `admin` | Modificación (no puede dejar turnos confirmados afuera) |
+| DELETE | `/agendas/:id` | `medico` (propia), `operador` (su sede), `admin` | Baja (409 si tiene turnos)  |
 
 ### Turnos, historial clínico y notificaciones (semana 3)
 
@@ -150,10 +170,10 @@ Ejemplo de error:
 | ------ | ----------------------------- | ----------------------- | -------------------------------------------------- |
 | POST   | `/turnos`                     | `paciente`, `operador`  | Alta. El paciente para sí; el operador en su nombre |
 | GET    | `/turnos/mios`                | `paciente`              | Sus turnos, del más próximo al menos próximo        |
-| GET    | `/turnos/medico?fecha=`       | `medico`                | Turnos programados del médico para esa fecha        |
-| GET    | `/turnos/sede?fecha=`         | `operador`              | Turnos de su sede para esa fecha                    |
+| GET    | `/turnos/medico?fecha=&id_sede=` | `medico`             | Turnos del médico para esa fecha, en todas sus sedes |
+| GET    | `/turnos/sede?fecha=&id_medico=` | `operador`           | Turnos de su sede para esa fecha                    |
 | PATCH  | `/turnos/:id/cancelar`        | `paciente`, `operador`, `medico` | Pasa el turno a `cancelado`               |
-| PATCH  | `/turnos/:id/atender`         | `medico`                | Pasa el turno a `atendido`                          |
+| PATCH  | `/turnos/:id/atender`         | `medico`                | Pasa el turno a `atendido` (con historial opcional en el body) |
 | POST   | `/historial/:idTurno`         | `medico`                | Registra diagnóstico, tratamiento y observaciones   |
 | GET    | `/historial/mio`              | `paciente`              | La totalidad de su historial                        |
 | GET    | `/historial/paciente/:id`     | `medico`                | Solo los registros que cargó ese médico             |
@@ -173,7 +193,7 @@ Detalles que vale la pena tener a mano:
 
 | Método | Ruta                                  | Protección | Descripción                                       |
 | ------ | ------------------------------------- | ---------- | ------------------------------------------------- |
-| GET    | `/auditoria`                          | `admin`    | Log filtrable por usuario, entidad y rango de fechas |
+| GET    | `/auditoria`                          | `admin`    | Log paginado, filtrable por usuario, entidad y rango de fechas |
 | GET    | `/reportes/turnos-por-especialidad`   | `admin`    | Conteo agrupado                                   |
 | GET    | `/reportes/turnos-por-sede`           | `admin`    | Conteo agrupado                                   |
 | GET    | `/reportes/ranking-medicos`           | `admin`    | Médicos por turnos atendidos, la lista completa   |
@@ -203,7 +223,7 @@ La tabla de rutas es explícita en vez de deducir la acción del verbo HTTP, por
 
 #### Documentación de la API
 
-`GET /docs` sirve la especificación OpenAPI 3 con **Swagger UI**. Cubre los 37 endpoints de las cuatro semanas, cada uno con método, ruta, parámetros, cuerpo esperado, respuestas de éxito y de error, y el rol que puede usarlo.
+`GET /docs` sirve la especificación OpenAPI 3 con **Swagger UI**. Cubre los 46 endpoints (los 37 de las cuatro semanas más los 9 de la etapa frontend), cada uno con método, ruta, parámetros, cuerpo esperado, respuestas de éxito y de error, y el rol que puede usarlo.
 
 Es pública a propósito: si pidiera token, quien tiene que aprender a consumir la API necesitaría saber consumirla antes para conseguirlo. No expone datos, solo la forma de los endpoints.
 
@@ -228,13 +248,40 @@ Cuerpo del alta y la modificación:
 }
 ```
 
-**Reglas de acceso.** El rol `paciente` recibe 403 en los cuatro endpoints. El `operador` y el `admin` gestionan la agenda de cualquier médico y sede. El `medico` solo la propia:
+**Reglas de acceso.** El rol `paciente` recibe 403 en los cuatro endpoints. El `admin` gestiona la agenda de cualquier médico y sede; el `operador`, la de cualquier médico **pero solo en su sede** (desde la entrega final; consultar otras sedes sigue permitido). El `medico` solo la propia, en cualquier sede:
 
 - si intenta crear una agenda con otro `id_medico` → **403**;
 - si intenta modificar o borrar una agenda ajena → **403**;
 - en el listado se le fuerza el filtro a su propio id, aunque pida otro por query.
 
 **Validaciones.** Horas en formato `HH:MM` con entrada anterior a salida · fecha `YYYY-MM-DD` real · el `id_medico` debe existir y tener rol `medico` · especialidad y sede deben existir · el rango **no puede solaparse** con otro del mismo médico ese día (409). Sí se permiten varios rangos por día que no se pisen, e incluso contiguos (08:00-12:00 y 12:00-16:00).
+
+## Cambios para el frontend (entrega final)
+
+La consigna final del frontend (`docs/Frontend-enunciado-completo.pdf`) sugiere ajustes a la API y deja que cada grupo los resuelva. Todos respetan la respuesta uniforme, están protegidos por rol, quedan en la auditoría cuando corresponde y están documentados en Swagger (`/docs`) y en `postman/Clinica-Frontend-Final.postman_collection.json`.
+
+**Endpoints nuevos**
+
+| Método | Ruta | Protección | Descripción |
+| ------ | ---- | ---------- | ----------- |
+| GET | `/medicos?id_especialidad=&id_sede=` | cualquier sesión | Médicos con sus especialidades, sin otros datos personales |
+| GET | `/disponibilidad/fechas?id_medico=&id_especialidad=&id_sede=` | `paciente`, `operador` | Fechas (desde hoy) con agenda y algún horario libre |
+| GET | `/disponibilidad/horarios?...&fecha=` | `paciente`, `operador` | Horarios libres de ese día, en turnos de **30 minutos** |
+| GET | `/pacientes?busqueda=` | `operador`, `medico`, `admin` | Búsqueda por DNI o apellido |
+| POST | `/pacientes` | `operador` | Alta de paciente (mismas validaciones que el registro) |
+| PUT | `/pacientes/mis-datos` | `paciente` | Solo email, contraseña, teléfono y cobertura |
+| GET | `/usuarios?nombre=&apellido=&rol=&id_sede=&pagina=&limite=` | `admin` | Listado paginado de usuarios |
+| POST | `/usuarios` | `admin` | Alta de operador, médico (con especialidades) o administrador |
+| PUT | `/usuarios/:id` | `admin` | Edición de cualquier usuario, incluidas las especialidades del médico |
+
+**Reglas que cambiaron**
+
+- **Turnos:** los listados devuelven los nombres (médico, paciente, especialidad, sede), la fecha de nacimiento del paciente y el resumen del historial. El médico opera sobre **sus** turnos en **cualquier sede** donde atienda (antes, solo en la suya). El alta solo acepta horarios futuros de la grilla de 30 minutos y es transaccional: si dos pacientes piden el mismo horario a la vez, el segundo recibe 409. `atender` puede recibir el historial en el mismo pedido. Se notifica al paciente, al médico y, si actuó, al operador.
+- **Agenda:** el operador solo da de alta, modifica o elimina rangos de su sede (403). El médico tiene que tener la especialidad del rango. No se puede eliminar un rango con turnos confirmados ni modificarlo dejándolos afuera (409 con mensaje claro).
+- **Auditoría:** `GET /auditoria` es paginado (`{ items, total, pagina, limite }`) y suma el filtro de texto `usuario`. Se auditan también las altas y ediciones de usuarios, el alta de pacientes del operador y "mis datos".
+- **Manejador de errores:** si la base rechaza una operación por integridad referencial, responde 409/400 en lugar de 500 (red de contención).
+
+> **Colecciones de las semanas anteriores.** Las de las semanas 1 a 4 prueban el contrato de su entrega, y algunas pruebas ya no coinciden a propósito con la API final: por ejemplo, `GET /sedes` ya no da 403 a un paciente, el operador ya no puede cargar agenda en otra sede y `/auditoria` ya no devuelve un array. Esas entregas siguen intactas en sus ramas `entrega-backend-N`. Para la API final, la colección que vale es `Clinica-Frontend-Final`.
 
 ### Middlewares
 
@@ -271,6 +318,8 @@ Disponibles después de correr `scripts/usuarios-prueba.sql`:
 | `20111222` | `medico123`   | `medico`   | Ana Lopez       |
 | `25333444` | `medico123`   | `medico`   | Carlos Ruiz     |
 | `36000960` | `paciente123` | `paciente` | Franco Friggeri |
+| `27444555` | `medico123`   | `medico`   | Lucía Fernandez (la agrega `datos-prueba.sql`) |
+| `40111222` | `paciente123` | `paciente` | Laura Martinez (la agrega `datos-prueba.sql`) |
 
 Carlos Ruiz no viene en el script de la cátedra: lo agrega `usuarios-prueba.sql`. Con un solo médico sería imposible demostrar que un médico no puede modificar la agenda de otro, porque no habría "otro".
 
@@ -288,6 +337,9 @@ En [postman/](postman/) hay una por entrega:
 | `Clinica-Backend-Semana2.postman_collection.json` | CRUD de sedes, especialidades, coberturas y agenda (52 requests) |
 | `Clinica-Backend-Semana3.postman_collection.json` | Turnos, historial clínico y notificaciones (56 requests) |
 | `Clinica-Backend-Semana4.postman_collection.json` | Auditoría, reportes y consistencia (50 requests) |
+| `Clinica-Frontend-Final.postman_collection.json` | Endpoints nuevos y reglas cambiadas para el frontend final (41 requests, 90 asserts) |
+
+**Frontend final** — requiere los tres scripts SQL cargados. Se puede correr completa las veces que haga falta: cada corrida usa un DNI nuevo y el primer horario libre que devuelve la disponibilidad.
 
 Importarlas en Postman (**Import** → arrastrar el archivo) y ejecutar las carpetas **en orden**.
 
@@ -342,8 +394,9 @@ src/
 └── index.ts                   # arranque de Express
 postman/                       # una colección de pruebas por semana
 scripts/
-└── usuarios-prueba.sql        # contraseñas reales para poder loguearse
-docs/                          # consignas en PDF + script de la base
+├── usuarios-prueba.sql        # contraseñas reales para poder loguearse
+└── datos-prueba.sql           # 3 médicos, agenda en 2 sedes, turnos en 3 estados
+docs/                          # consignas en PDF, script de la base y ARQUITECTURA.md
 ```
 
 Cada entidad sigue el mismo esqueleto —**ruta → controller → validator → service → base**—, así que agregar una es agregar los archivos homónimos en esas cuatro carpetas.
@@ -355,5 +408,7 @@ express.json() → /docs → auditar → rutas → 404 → manejadorErrores
 ```
 
 `auditar` va antes de las rutas porque envuelve `res.json`; el 404 y el manejador de errores van últimos porque son la red de contención.
+
+El recorrido completo de una petición, con la tabla endpoint → controller → service → rol, está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 
 Convenciones: identificadores en español, replicando la nomenclatura de la base. Queries siempre parametrizadas con `?`. Controladores finos, lógica en los services. Todo el código documentado (ver `CLAUDE.md`, sección 4.1).

@@ -18,6 +18,10 @@
  * payload para ponerse `rol: "admin"`, la firma deja de coincidir y
  * `jwt.verify` lo rechaza, porque para generar una firma válida haría falta el
  * secreto, que solo está en el `.env` del servidor.
+ *
+ * Con qué se conecta: `firmarToken` lo usa `auth.service.ts` en el login;
+ * `verificarFirmaToken` lo usa `middlewares/verificarToken.ts` en cada
+ * petición protegida. Lee secreto y vencimiento de `config/env.ts`.
  */
 
 import jwt, { SignOptions } from "jsonwebtoken";

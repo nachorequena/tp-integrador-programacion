@@ -8,6 +8,11 @@
  *
  * El rango se valida con la misma función en los cuatro para que no haya un
  * reporte que acepte una fecha que otro rechaza.
+ *
+ * Con qué se conecta: `routes/reporte.routes.ts` (solo admin) → este
+ * controller → `validators/reporte.validators.ts` y
+ * `services/reporte.service.ts`. Lo consume el dashboard de reportes del
+ * frontend, que pide los cuatro a la vez con el mismo rango.
  */
 
 import { NextFunction, Request, Response } from "express";

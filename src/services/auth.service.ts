@@ -20,6 +20,12 @@
  * un "salt" aleatorio a cada contraseña. Por eso dos usuarios con la misma
  * contraseña tienen hashes distintos, y probar contraseñas por fuerza bruta se
  * vuelve carísimo.
+ *
+ * Con qué se conecta: lo llaman `controllers/auth.controller.ts` (registro y
+ * login) y `controllers/paciente.controller.ts` (alta de pacientes del
+ * operador). Se apoya en `usuario.service.ts`, `cobertura.service.ts` y
+ * `utils/jwt.ts`. `SALT_ROUNDS` se exporta para que `paciente.service.ts` y
+ * `gestion-usuario.service.ts` hasheen igual.
  */
 
 import bcrypt from "bcrypt";

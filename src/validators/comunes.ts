@@ -10,6 +10,9 @@
  * Convención de los validadores del proyecto: acumulan los errores en un array
  * y al final llaman a `lanzarSiHayErrores`, para que el cliente reciba TODOS
  * los problemas en un solo 400 y no los descubra de a uno.
+ *
+ * Con qué se conecta: lo importan todos los archivos de `validators/` y
+ * algunos controllers (`validarIdRuta`, `comoObjeto`).
  */
 
 import { ErrorHttp } from "../utils/errorHttp";

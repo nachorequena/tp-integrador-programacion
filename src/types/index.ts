@@ -12,6 +12,10 @@
  * `coberturaId` ni `fecha_nacimiento` a `fechaNacimiento`: si el nombre no
  * coincide con el de la columna, el `INSERT` o el `SELECT` deja de funcionar y
  * el error es difícil de encontrar.
+ *
+ * Con qué se conecta: lo importan los validators (que devuelven estos tipos),
+ * los services (que los reciben y devuelven) y los controllers. Las secciones
+ * están ordenadas por semana; la última es la de la etapa frontend.
  */
 
 /**

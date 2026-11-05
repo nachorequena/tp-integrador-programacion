@@ -21,6 +21,10 @@
  * NOTA SOBRE mysql2: `pool.query` devuelve un array `[filas, metadatos]`. Por
  * eso el `const [filas] = await ...`, que desestructura y se queda solo con el
  * primer elemento.
+ *
+ * Con qué se conecta: lo usan `auth.service.ts` (login y registro),
+ * `agenda.service.ts` (`esMedico`), `paciente.service.ts` y
+ * `gestion-usuario.service.ts` (`buscarPublicoPorId`). Tabla: `usuario`.
  */
 
 import { ResultSetHeader, RowDataPacket } from "mysql2";
