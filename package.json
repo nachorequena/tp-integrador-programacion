@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "iniciar": "node scripts/iniciar.cjs",
+    "base:reiniciar": "node scripts/iniciar.cjs --base-nueva --solo-base"
   },
   "keywords": [],
   "author": "",

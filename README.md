@@ -17,6 +17,29 @@ Stack: Node.js + Express 5 + TypeScript + MySQL/MariaDB (`mysql2` con SQL crudo,
 
 ## Puesta en marcha
 
+### Forma rápida
+
+```bash
+npm run iniciar
+```
+
+Con MySQL/MariaDB encendido, este comando ([scripts/iniciar.cjs](scripts/iniciar.cjs)) hace en orden:
+
+1. Instala las dependencias si faltan.
+2. Si no hay `.env`, lo crea:
+   - detecta el puerto de MySQL;
+   - pregunta usuario y contraseña solo si `root` sin contraseña no entra;
+   - genera un `JWT_SECRET` aleatorio.
+3. Prepara la base:
+   - si no existe, la crea e importa los tres scripts en orden;
+   - si existe pero no tiene agenda para hoy, vuelve a correr `datos-prueba.sql`.
+4. Verifica que el puerto esté libre.
+5. Levanta la API con `npm run dev`.
+
+`npm run base:reiniciar` borra la base y la recrea desde cero, sin levantar la API.
+
+Los pasos manuales equivalentes son los siguientes.
+
 ### 1. Crear e importar la base
 
 El script `docs/clinica_ampliada.sql` **solo crea las tablas**: no incluye `CREATE DATABASE` ni `USE`. Hay que crear la base primero.
@@ -99,6 +122,8 @@ Scripts disponibles:
 | `npm run dev`   | Servidor en modo desarrollo con recarga (`tsx`) |
 | `npm run build` | Compila TypeScript a `dist/`                    |
 | `npm start`     | Ejecuta la versión compilada                    |
+| `npm run iniciar` | Prepara todo (dependencias, `.env`, base) y levanta la API |
+| `npm run base:reiniciar` | Borra la base y la recrea con los tres scripts |
 
 ---
 
@@ -394,6 +419,7 @@ src/
 └── index.ts                   # arranque de Express
 postman/                       # una colección de pruebas por semana
 scripts/
+├── iniciar.cjs                # npm run iniciar: puesta en marcha automática
 ├── usuarios-prueba.sql        # contraseñas reales para poder loguearse
 └── datos-prueba.sql           # 3 médicos, agenda en 2 sedes, turnos en 3 estados
 docs/                          # consignas en PDF, script de la base y ARQUITECTURA.md
