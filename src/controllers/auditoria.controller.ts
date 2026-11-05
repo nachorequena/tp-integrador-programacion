@@ -17,9 +17,15 @@ import { responder } from "../utils/respuesta";
 import { validarFiltrosAuditoria } from "../validators/auditoria.validators";
 
 /**
- * `GET /auditoria` — listado filtrable por usuario, entidad y rango de fechas.
+ * `GET /auditoria?usuario=&id_usuario=&entidad=&desde=&hasta=&pagina=&limite=`
  *
- * Los cuatro filtros son opcionales y se combinan entre sí.
+ * Listado paginado, de lo más reciente a lo más antiguo, filtrable por
+ * usuario, entidad y rango de fechas. Los filtros son opcionales y se combinan
+ * entre sí.
+ *
+ * Responde `{ items, total, pagina, limite }` (desde la etapa del frontend; en
+ * la semana 4 era un array sin paginar). Flujo: este controller →
+ * `auditoria.validators.ts` → `auditoria.service.ts`.
  */
 export async function listar(
   req: Request,
@@ -27,9 +33,9 @@ export async function listar(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const filtros = validarFiltrosAuditoria(req.query);
-    const logs = await auditoriaService.listarLogs(filtros);
-    responder(res, 200, "ok", logs);
+    const { filtros, paginacion } = validarFiltrosAuditoria(req.query);
+    const pagina = await auditoriaService.listarLogs(filtros, paginacion);
+    responder(res, 200, "ok", pagina);
   } catch (error) {
     next(error);
   }

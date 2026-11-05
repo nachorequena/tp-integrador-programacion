@@ -4,10 +4,15 @@
  *
  * Alta, cancelación, atención y listados de turnos.
  *
+ * Flujo: `turno.routes.ts` → este controller → validators
+ * (`turno.validators.ts`, `historial.validators.ts`) → `turno.service.ts` →
+ * `responder`.
+ *
  * Como el de agenda, estos controllers le pasan `req.usuario` al service:
- * `verificarRol` filtra por rol, pero las reglas de esta semana dependen de
- * QUIÉN pide (un paciente solo cancela el suyo, un operador solo los de su
- * sede). Esa parte la resuelve el service, que es el que puede leer la fila.
+ * `verificarRol` filtra por rol, pero las reglas dependen de QUIÉN pide (un
+ * paciente solo cancela el suyo, un operador solo los de su sede, un médico
+ * solo los suyos). Esa parte la resuelve el service, que es el que lee la
+ * fila.
  *
  * Lo que sí se decide acá es de quién es el turno que se está sacando: el
  * paciente lo saca para sí mismo y el operador en representación de otro. Es
@@ -19,11 +24,9 @@ import * as turnoService from "../services/turno.service";
 import { PayloadJWT } from "../types";
 import { ErrorHttp } from "../utils/errorHttp";
 import { responder } from "../utils/respuesta";
-import { validarIdRuta } from "../validators/comunes";
-import {
-  validarFechaObligatoria,
-  validarNuevoTurno,
-} from "../validators/turno.validators";
+import { comoObjeto, validarIdRuta } from "../validators/comunes";
+import { validarHistorial } from "../validators/historial.validators";
+import { validarFiltrosTurnosDia, validarNuevoTurno } from "../validators/turno.validators";
 
 /**
  * Devuelve el usuario autenticado o corta la petición.
@@ -49,6 +52,8 @@ function usuarioAutenticado(req: Request): PayloadJWT {
  * Lo puede pedir el propio paciente o un operador en su representación. En el
  * primer caso el paciente sale del token y `id_paciente` del cuerpo se ignora:
  * si se tomara del body, un paciente podría sacarle turnos a otro.
+ *
+ * Responde 201 con el turno creado (detallado) y un mensaje.
  */
 export async function crear(
   req: Request,
@@ -60,31 +65,21 @@ export async function crear(
     const datos = validarNuevoTurno(req.body);
 
     let idPaciente: number;
-
     if (usuario.rol === "paciente") {
       idPaciente = usuario.id;
     } else {
       if (datos.id_paciente === undefined) {
         throw new ErrorHttp(400, "El operador debe indicar el paciente");
       }
-
       // El operador solo opera sobre su propia sede, como pide la consigna.
       if (usuario.id_sede === null || datos.id_sede !== usuario.id_sede) {
-        throw new ErrorHttp(
-          403,
-          "El operador solo puede solicitar turnos de su propia sede",
-        );
+        throw new ErrorHttp(403, "El operador solo puede solicitar turnos de su propia sede");
       }
-
       idPaciente = datos.id_paciente;
     }
 
-    const idTurno = await turnoService.crearTurno(datos, idPaciente);
-
-    responder(res, 201, "ok", {
-      id: idTurno,
-      mensaje: "Turno confirmado correctamente",
-    });
+    const turno = await turnoService.crearTurno(datos, idPaciente, usuario);
+    responder(res, 201, "ok", { ...turno, mensaje: "Turno confirmado correctamente" });
   } catch (error) {
     next(error);
   }
@@ -104,21 +99,21 @@ export async function cancelar(
   try {
     const usuario = usuarioAutenticado(req);
     const idTurno = validarIdRuta(req.params.id);
-
-    await turnoService.cancelarTurno(
-      idTurno,
-      usuario.id,
-      usuario.rol,
-      usuario.id_sede,
-    );
-
-    responder(res, 200, "ok", { mensaje: "Turno cancelado correctamente" });
+    const turno = await turnoService.cancelarTurno(idTurno, usuario);
+    responder(res, 200, "ok", { ...turno, mensaje: "Turno cancelado correctamente" });
   } catch (error) {
     next(error);
   }
 }
 
-/** `PATCH /turnos/:id/atender` — el médico pasa el turno a `atendido`. */
+/**
+ * `PATCH /turnos/:id/atender` — el médico pasa el turno a `atendido`.
+ *
+ * El cuerpo es opcional. Si trae `diagnostico` (y opcionalmente `tratamiento`
+ * y `observaciones`), se valida como un historial clínico y se guarda junto
+ * con el cambio de estado: es la acción "Marcar como atendido" del frontend,
+ * que carga el historial en el mismo paso. Sin cuerpo, solo cambia el estado.
+ */
 export async function atender(
   req: Request,
   res: Response,
@@ -128,9 +123,13 @@ export async function atender(
     const usuario = usuarioAutenticado(req);
     const idTurno = validarIdRuta(req.params.id);
 
-    await turnoService.atenderTurno(idTurno, usuario.id, usuario.id_sede);
+    // Un body vacío llega como `{}` (o `undefined` sin Content-Type): en los
+    // dos casos se interpreta como "sin historial".
+    const cuerpo = req.body === undefined ? {} : comoObjeto(req.body);
+    const historial = cuerpo.diagnostico !== undefined ? validarHistorial(cuerpo) : undefined;
 
-    responder(res, 200, "ok", { mensaje: "Turno marcado como atendido" });
+    const turno = await turnoService.atenderTurno(idTurno, usuario, historial);
+    responder(res, 200, "ok", { ...turno, mensaje: "Turno marcado como atendido" });
   } catch (error) {
     next(error);
   }
@@ -156,7 +155,11 @@ export async function misTurnos(
   }
 }
 
-/** `GET /turnos/medico?fecha=YYYY-MM-DD` — turnos programados del médico. */
+/**
+ * `GET /turnos/medico?fecha=YYYY-MM-DD&id_sede=` — turnos del médico.
+ *
+ * Sin `id_sede` devuelve los de todas las sedes donde atiende ese día.
+ */
 export async function turnosMedico(
   req: Request,
   res: Response,
@@ -164,9 +167,8 @@ export async function turnosMedico(
 ): Promise<void> {
   try {
     const usuario = usuarioAutenticado(req);
-    const fecha = validarFechaObligatoria(req.query);
-
-    const turnos = await turnoService.listarTurnosMedico(usuario.id, fecha);
+    const { fecha, id_sede } = validarFiltrosTurnosDia(req.query);
+    const turnos = await turnoService.listarTurnosMedico(usuario.id, { fecha, id_sede });
     responder(res, 200, "ok", turnos);
   } catch (error) {
     next(error);
@@ -174,7 +176,8 @@ export async function turnosMedico(
 }
 
 /**
- * `GET /turnos/sede?fecha=YYYY-MM-DD` — turnos de la sede, para el operador.
+ * `GET /turnos/sede?fecha=YYYY-MM-DD&id_medico=` — turnos de la sede, para el
+ * operador.
  *
  * La sede sale del token y no de la query: el operador solo puede ver la suya.
  */
@@ -185,13 +188,11 @@ export async function turnosSede(
 ): Promise<void> {
   try {
     const usuario = usuarioAutenticado(req);
-    const fecha = validarFechaObligatoria(req.query);
-
+    const { fecha, id_medico } = validarFiltrosTurnosDia(req.query);
     if (usuario.id_sede === null) {
       throw new ErrorHttp(403, "El usuario no tiene una sede asignada");
     }
-
-    const turnos = await turnoService.listarTurnosSede(usuario.id_sede, fecha);
+    const turnos = await turnoService.listarTurnosSede(usuario.id_sede, { fecha, id_medico });
     responder(res, 200, "ok", turnos);
   } catch (error) {
     next(error);

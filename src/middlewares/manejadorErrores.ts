@@ -67,7 +67,23 @@ export function manejadorErrores(
     return;
   }
 
-  // Caso 3: inesperado. Al log completo, al cliente solo lo genérico.
+  // Caso 3: la base rechazó la operación por integridad referencial. Las
+  // bajas validan sus dependencias antes de borrar (ver
+  // `dependencias.service.ts`), así que esto no debería pasar. Es la red de
+  // contención por si alguna relación se escapara: un 409 con un mensaje
+  // entendible es mucho mejor que un 500, y la consigna del frontend pide
+  // mostrar "el mensaje del backend" cuando una baja se rechaza.
+  const codigoMysql = (error as { code?: unknown } | null)?.code;
+  if (codigoMysql === "ER_ROW_IS_REFERENCED_2" || codigoMysql === "ER_ROW_IS_REFERENCED") {
+    responder(res, 409, "No se puede completar la operación: el registro está en uso por otros datos", null);
+    return;
+  }
+  if (codigoMysql === "ER_NO_REFERENCED_ROW_2" || codigoMysql === "ER_NO_REFERENCED_ROW") {
+    responder(res, 400, "Alguno de los datos indicados hace referencia a un registro que no existe", null);
+    return;
+  }
+
+  // Caso 4: inesperado. Al log completo, al cliente solo lo genérico.
   console.error("[error inesperado]", error);
   responder(res, 500, "Error interno del servidor", null);
 }

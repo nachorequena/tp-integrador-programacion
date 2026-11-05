@@ -36,7 +36,7 @@ import * as usuarioService from "./usuario.service";
  * 10 es el equilibrio habitual (unos 50-100 ms por hash). Subirlo a 15 haría el
  * login perceptiblemente lento.
  */
-const SALT_ROUNDS = 10;
+export const SALT_ROUNDS = 10;
 
 /**
  * Da de alta un paciente.

@@ -5,44 +5,48 @@
  * CRUD de la tabla `agenda`: los rangos horarios que cada médico atiende en una
  * sede, para una especialidad y una fecha.
  *
- * Es el service más complejo de la entrega porque combina tres cosas:
+ * Flujo: `agenda.routes.ts` → `agenda.controller.ts` → este service → tablas
+ * `agenda`, `turno` (para contar y proteger los turnos), `usuario`,
+ * `especialidad`, `sede` y `medico_especialidad` (vía `medico.service.ts`).
+ *
+ * Quién lo usa desde el frontend: el médico ("Mi agenda"), el operador
+ * ("Agendas médicas" de su sede) y el administrador.
+ *
+ * Es el service más complejo del backend porque combina cuatro cosas:
  *
  *   1. **Validaciones de existencia** — médico, especialidad y sede tienen que
- *      existir (son claves foráneas) y el médico tiene que ser realmente médico.
+ *      existir (son claves foráneas), el médico tiene que ser realmente médico
+ *      y tener esa especialidad asignada.
  *   2. **Reglas de pertenencia por rol** — un `medico` solo puede tocar SU
- *      agenda. Esto NO lo puede resolver `verificarRol`, que solo mira el rol y
- *      no sabe de quién es cada fila. Se resuelve acá, con la fila en la mano.
+ *      agenda y un `operador` solo la de SU sede (esto último lo agregó la
+ *      consigna final; consultar otras sedes sigue permitido). Esto NO lo
+ *      puede resolver `verificarRol`, que solo mira el rol y no sabe de quién
+ *      es cada fila. Se resuelve acá, con la fila en la mano.
  *   3. **Solapamiento** — un médico no puede estar en dos lugares a la vez.
+ *   4. **Protección de los turnos confirmados** — no se puede eliminar un rango
+ *      con turnos confirmados ni modificarlo dejando alguno afuera (consigna
+ *      final). La interfaz lo informa con el mensaje que se arma acá.
  *
- * La consigna permite varios rangos por día para el mismo médico; lo que se
- * rechaza es que se pisen entre sí.
+ * La consigna permite varios rangos por día para el mismo médico, incluso en
+ * sedes distintas; lo que se rechaza es que se pisen entre sí.
  */
 
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { pool } from "../database/conexion";
 import {
   Agenda,
-  AgendaDetallada,
+  AgendaConTurnos,
   DatosAgenda,
   FiltrosAgenda,
   PayloadJWT,
 } from "../types";
 import { ErrorHttp } from "../utils/errorHttp";
-import { buscarDependencias, Dependencia } from "./dependencias.service";
+import { aMinutos } from "../utils/fechas";
+import { DURACION_TURNO } from "./disponibilidad.service";
 import { existeEspecialidad } from "./especialidad.service";
+import { tieneEspecialidad } from "./medico.service";
 import { existeSede } from "./sede.service";
 import { esMedico } from "./usuario.service";
-
-/**
- * Relaciones que impiden borrar una agenda.
- *
- * La consigna no menciona ninguna, pero `turno.id_agenda` es una clave foránea:
- * borrar una agenda con turnos daría un error de FK → 500. De `turno` (semana
- * 3+) solo se cuenta, no se implementa nada más.
- */
-const DEPENDENCIAS_AGENDA: Dependencia[] = [
-  { etiqueta: "turnos asignados", tabla: "turno", columna: "id_agenda" },
-];
 
 /**
  * SELECT base del listado, con los nombres resueltos por JOIN.
@@ -54,13 +58,20 @@ const DEPENDENCIAS_AGENDA: Dependencia[] = [
  * Los JOIN son internos (no LEFT) a propósito: las tres columnas son NOT NULL
  * con clave foránea, así que siempre tienen correspondencia. Si una fila
  * desapareciera del listado, sería señal de un problema de integridad real.
+ *
+ * Las dos subconsultas cuentan los turnos del rango. El frontend las usa para
+ * no ofrecer acciones que se van a rechazar (deshabilita "eliminar" si hay
+ * turnos confirmados) y para avisar por qué.
  */
 const SELECT_AGENDA = `
   SELECT a.id, a.hora_entrada, a.hora_salida, a.fecha,
          a.id_medico, a.id_especialidad, a.id_sede,
          CONCAT(u.apellido, ', ', u.nombre) AS medico,
          e.descripcion AS especialidad,
-         s.nombre AS sede
+         s.nombre AS sede,
+         (SELECT COUNT(*) FROM turno t
+           WHERE t.id_agenda = a.id AND t.estado = 'confirmado') AS turnos_confirmados,
+         (SELECT COUNT(*) FROM turno t WHERE t.id_agenda = a.id) AS turnos_totales
     FROM agenda a
     JOIN usuario u ON u.id = a.id_medico
     JOIN especialidad e ON e.id = a.id_especialidad
@@ -85,7 +96,7 @@ const SELECT_AGENDA = `
 export async function listarAgendas(
   filtros: FiltrosAgenda,
   usuario: PayloadJWT,
-): Promise<AgendaDetallada[]> {
+): Promise<AgendaConTurnos[]> {
   const condiciones: string[] = [];
   const parametros: unknown[] = [];
 
@@ -114,7 +125,7 @@ export async function listarAgendas(
     parametros,
   );
 
-  return filas as AgendaDetallada[];
+  return filas as AgendaConTurnos[];
 }
 
 /**
@@ -142,20 +153,25 @@ export async function buscarAgendaPorId(id: number): Promise<Agenda | null> {
  * @param id Id de la agenda.
  * @returns La agenda con médico, especialidad y sede, o `null` si no existe.
  */
-async function buscarAgendaDetallada(id: number): Promise<AgendaDetallada | null> {
+async function buscarAgendaDetallada(id: number): Promise<AgendaConTurnos | null> {
   const [filas] = await pool.query<RowDataPacket[]>(
     `${SELECT_AGENDA} WHERE a.id = ? LIMIT 1`,
     [id],
   );
-  return (filas[0] as AgendaDetallada | undefined) ?? null;
+  return (filas[0] as AgendaConTurnos | undefined) ?? null;
 }
 
 /**
- * Comprueba que las tres claves foráneas existan y que el médico sea médico.
+ * Comprueba que las tres claves foráneas existan, que el médico sea médico y
+ * que tenga asignada la especialidad del rango.
+ *
+ * La última condición la pide la consigna final ("la especialidad se elige
+ * entre las del propio médico"). El frontend ya ofrece solo esas, pero la API
+ * no puede confiar en que el cliente sea siempre esa pantalla.
  *
  * @param datos Datos de la agenda, ya validados en formato.
- * @throws `ErrorHttp` 400 si alguna referencia no existe o el usuario indicado
- *   como médico no tiene ese rol.
+ * @throws `ErrorHttp` 400 si alguna referencia no existe, el usuario indicado
+ *   como médico no tiene ese rol o no tiene esa especialidad.
  */
 async function validarReferencias(datos: DatosAgenda): Promise<void> {
   if (!(await esMedico(datos.id_medico))) {
@@ -170,6 +186,10 @@ async function validarReferencias(datos: DatosAgenda): Promise<void> {
 
   if (!(await existeSede(datos.id_sede))) {
     throw new ErrorHttp(400, "La sede indicada no existe");
+  }
+
+  if (!(await tieneEspecialidad(datos.id_medico, datos.id_especialidad))) {
+    throw new ErrorHttp(400, "El médico no tiene asignada la especialidad indicada");
   }
 }
 
@@ -224,17 +244,94 @@ async function validarSolapamiento(
 }
 
 /**
- * Comprueba que quien opera pueda hacerlo sobre la agenda de ese médico.
+ * Comprueba que quien opera pueda hacerlo sobre ese rango de agenda.
  *
- * `operador` y `admin` pueden con cualquiera. El `medico` solo consigo mismo.
+ *   - `admin`: cualquiera.
+ *   - `medico`: solo los suyos (en cualquier sede: puede atender en varias).
+ *   - `operador`: solo los de SU sede. Es la regla nueva de la consigna final:
+ *     en la semana 2 el operador gestionaba cualquier sede; ahora solo puede
+ *     consultar las demás.
  *
- * @param idMedicoDeLaAgenda Dueño de la agenda (existente o propuesta).
+ * Se llama con la fila existente Y con los datos nuevos: así un médico no se
+ * puede apropiar de la agenda de un colega ni un operador puede "mudar" un
+ * rango de su sede a otra.
+ *
+ * @param agenda Médico y sede del rango (existente o propuesto).
  * @param usuario Payload del token.
- * @throws `ErrorHttp` 403 si un médico intenta operar sobre agenda ajena.
+ * @throws `ErrorHttp` 403 si el rango no le corresponde a quien opera.
  */
-function validarPertenencia(idMedicoDeLaAgenda: number, usuario: PayloadJWT): void {
-  if (usuario.rol === "medico" && idMedicoDeLaAgenda !== usuario.id) {
+function validarPertenencia(
+  agenda: { id_medico: number; id_sede: number },
+  usuario: PayloadJWT,
+): void {
+  if (usuario.rol === "medico" && agenda.id_medico !== usuario.id) {
     throw new ErrorHttp(403, "Solo podés gestionar tu propia agenda");
+  }
+  if (usuario.rol === "operador" && agenda.id_sede !== usuario.id_sede) {
+    throw new ErrorHttp(403, "Solo podés modificar la agenda de tu sede");
+  }
+}
+
+/**
+ * Horas de los turnos confirmados de un rango.
+ *
+ * @param idAgenda Id del rango.
+ * @returns Las horas "HH:MM", en orden.
+ */
+async function horasConfirmadas(idAgenda: number): Promise<string[]> {
+  const [filas] = await pool.query<RowDataPacket[]>(
+    `SELECT hora FROM turno
+      WHERE id_agenda = ? AND estado = 'confirmado' AND hora IS NOT NULL
+      ORDER BY hora`,
+    [idAgenda],
+  );
+  return filas.map((fila) => String(fila.hora));
+}
+
+/**
+ * Impide una modificación que deje turnos confirmados afuera.
+ *
+ * La consigna final lo pide textual: "no se permite modificar un rango
+ * dejando algún turno confirmado fuera del nuevo horario". Además, si el rango
+ * tiene turnos confirmados, tampoco se le puede cambiar la fecha, el médico,
+ * la especialidad ni la sede: el turno quedaría apuntando a un rango que ya no
+ * es el que el paciente reservó.
+ *
+ * Un turno queda "adentro" si empieza a la hora de entrada o después y termina
+ * (inicio + 30 minutos) antes o justo a la hora de salida.
+ *
+ * @param existente Rango tal como está guardado.
+ * @param datos Datos nuevos propuestos.
+ * @throws `ErrorHttp` 409 con un mensaje que explica qué turnos lo impiden.
+ */
+async function validarTurnosConfirmados(existente: Agenda, datos: DatosAgenda): Promise<void> {
+  const horas = await horasConfirmadas(existente.id);
+  if (horas.length === 0) return;
+
+  const cambiaContexto =
+    existente.fecha !== datos.fecha ||
+    existente.id_medico !== datos.id_medico ||
+    existente.id_especialidad !== datos.id_especialidad ||
+    existente.id_sede !== datos.id_sede;
+
+  if (cambiaContexto) {
+    throw new ErrorHttp(
+      409,
+      `El rango tiene ${horas.length} turno(s) confirmado(s): no se puede cambiar su fecha, médico, especialidad ni sede. Cancelá esos turnos primero.`,
+    );
+  }
+
+  const entrada = aMinutos(datos.hora_entrada);
+  const salida = aMinutos(datos.hora_salida);
+  const afuera = horas.filter(
+    (hora) => aMinutos(hora) < entrada || aMinutos(hora) + DURACION_TURNO > salida,
+  );
+
+  if (afuera.length > 0) {
+    throw new ErrorHttp(
+      409,
+      `El nuevo horario deja afuera turnos confirmados (${afuera.join(", ")}). Ampliá el rango o cancelá esos turnos primero.`,
+    );
   }
 }
 
@@ -244,15 +341,16 @@ function validarPertenencia(idMedicoDeLaAgenda: number, usuario: PayloadJWT): vo
  * @param datos Datos ya validados en formato.
  * @param usuario Payload del token de quien la crea.
  * @returns La agenda creada, con médico, especialidad y sede resueltos.
- * @throws `ErrorHttp` 403 si un médico intenta crear agenda para otro.
+ * @throws `ErrorHttp` 403 si un médico intenta crear agenda para otro o un
+ *   operador intenta crearla en otra sede.
  * @throws `ErrorHttp` 400 si alguna referencia no existe.
  * @throws `ErrorHttp` 409 si el rango se solapa con otro del mismo médico.
  */
 export async function crearAgenda(
   datos: DatosAgenda,
   usuario: PayloadJWT,
-): Promise<AgendaDetallada> {
-  validarPertenencia(datos.id_medico, usuario);
+): Promise<AgendaConTurnos> {
+  validarPertenencia(datos, usuario);
   await validarReferencias(datos);
   await validarSolapamiento(datos);
 
@@ -280,32 +378,38 @@ export async function crearAgenda(
  * Modifica un rango de agenda existente.
  *
  * La pertenencia se controla DOS veces, y las dos hacen falta:
- *   - sobre la fila que ya está, para que un médico no edite la de otro;
- *   - sobre los datos nuevos, para que no se la reasigne a un colega.
+ *   - sobre la fila que ya está, para que un médico no edite la de otro (ni un
+ *     operador la de otra sede);
+ *   - sobre los datos nuevos, para que no se la reasigne a un colega (ni a
+ *     otra sede).
+ *
+ * Después se controla que el cambio no deje turnos confirmados afuera.
  *
  * @param id Id de la agenda a modificar.
  * @param datos Datos nuevos, ya validados en formato.
  * @param usuario Payload del token.
  * @returns La agenda actualizada.
  * @throws `ErrorHttp` 404 si la agenda no existe.
- * @throws `ErrorHttp` 403 si un médico intenta modificar agenda ajena.
+ * @throws `ErrorHttp` 403 si el rango no le corresponde a quien opera.
  * @throws `ErrorHttp` 400 si alguna referencia no existe.
- * @throws `ErrorHttp` 409 si el rango nuevo se solapa con otro.
+ * @throws `ErrorHttp` 409 si el rango nuevo se solapa con otro o deja turnos
+ *   confirmados afuera.
  */
 export async function actualizarAgenda(
   id: number,
   datos: DatosAgenda,
   usuario: PayloadJWT,
-): Promise<AgendaDetallada> {
+): Promise<AgendaConTurnos> {
   const existente = await buscarAgendaPorId(id);
   if (!existente) {
     throw new ErrorHttp(404, "La agenda indicada no existe");
   }
 
-  validarPertenencia(existente.id_medico, usuario);
-  validarPertenencia(datos.id_medico, usuario);
+  validarPertenencia(existente, usuario);
+  validarPertenencia(datos, usuario);
 
   await validarReferencias(datos);
+  await validarTurnosConfirmados(existente, datos);
   await validarSolapamiento(datos, id);
 
   await pool.query(
@@ -332,13 +436,21 @@ export async function actualizarAgenda(
 }
 
 /**
- * Elimina un rango de agenda, previa validación de dependencias.
+ * Elimina un rango de agenda, previa validación de sus turnos.
+ *
+ * Dos casos bloquean la baja, con mensajes distintos porque la solución es
+ * distinta:
+ *   - **turnos confirmados**: la consigna final lo prohíbe explícitamente. Hay
+ *     que cancelarlos primero.
+ *   - **turnos atendidos o cancelados**: no hay nada que cancelar, pero
+ *     `turno.id_agenda` es clave foránea. Borrar el rango haría fallar el
+ *     DELETE (500) o dejaría sin agenda al historial de esas consultas.
  *
  * @param id Id de la agenda a eliminar.
  * @param usuario Payload del token.
  * @throws `ErrorHttp` 404 si la agenda no existe.
- * @throws `ErrorHttp` 403 si un médico intenta borrar agenda ajena.
- * @throws `ErrorHttp` 409 si tiene turnos asignados.
+ * @throws `ErrorHttp` 403 si el rango no le corresponde a quien opera.
+ * @throws `ErrorHttp` 409 si tiene turnos.
  */
 export async function eliminarAgenda(
   id: number,
@@ -349,13 +461,24 @@ export async function eliminarAgenda(
     throw new ErrorHttp(404, "La agenda indicada no existe");
   }
 
-  validarPertenencia(existente.id_medico, usuario);
+  validarPertenencia(existente, usuario);
 
-  const bloqueantes = await buscarDependencias(id, DEPENDENCIAS_AGENDA);
-  if (bloqueantes.length > 0) {
+  const confirmados = await horasConfirmadas(id);
+  if (confirmados.length > 0) {
     throw new ErrorHttp(
       409,
-      `No se puede eliminar la agenda porque tiene ${bloqueantes.join(" y ")}`,
+      `No se puede eliminar el rango porque tiene ${confirmados.length} turno(s) confirmado(s). Cancelalos primero.`,
+    );
+  }
+
+  const [historicos] = await pool.query<RowDataPacket[]>(
+    "SELECT COUNT(*) AS cantidad FROM turno WHERE id_agenda = ?",
+    [id],
+  );
+  if (Number(historicos[0].cantidad) > 0) {
+    throw new ErrorHttp(
+      409,
+      "No se puede eliminar el rango porque tiene turnos atendidos o cancelados que forman parte del historial",
     );
   }
 

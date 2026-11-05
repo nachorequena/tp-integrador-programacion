@@ -307,6 +307,12 @@ export interface EntradaAuditoria {
  */
 export interface FiltrosAuditoria {
   id_usuario?: number;
+  /**
+   * Texto a buscar en apellido, nombre o DNI de quien hizo la acción. Lo usa
+   * el filtro "por usuario" de la pantalla de auditoría del frontend, que es
+   * más usable que pedir un id.
+   */
+  usuario?: string;
   entidad?: string;
   desde?: string;
   hasta?: string;
@@ -347,4 +353,193 @@ export interface TasaCancelacion {
   total: number;
   cancelados: number;
   tasa: number;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ETAPA FRONTEND — ajustes de la API pedidos por la consigna final
+   (docs/Frontend-enunciado-completo.pdf, "Sugerencias de cambios en el backend")
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Agenda con los nombres resueltos y la cantidad de turnos que la usan.
+ *
+ * Los conteos los necesita el frontend para no ofrecer acciones que el
+ * backend va a rechazar: con `turnos_confirmados > 0` la baja del rango se
+ * deshabilita en la interfaz, como pide el criterio de aceptación.
+ */
+export interface AgendaConTurnos extends AgendaDetallada {
+  turnos_confirmados: number;
+  turnos_totales: number;
+}
+
+/** Especialidad de un médico, tal como viaja dentro de `MedicoListado`. */
+export interface EspecialidadDeMedico {
+  id: number;
+  descripcion: string;
+}
+
+/**
+ * Médico tal como lo devuelve `GET /medicos`.
+ *
+ * Solo nombre, apellido, sede y especialidades: la consigna pide
+ * explícitamente "sin otros datos personales", porque este listado lo ve
+ * cualquier usuario con sesión (incluidos los pacientes).
+ */
+export interface MedicoListado {
+  id: number;
+  nombre: string;
+  apellido: string;
+  id_sede: number | null;
+  especialidades: EspecialidadDeMedico[];
+}
+
+/** Filtros opcionales de `GET /medicos`, ya validados. */
+export interface FiltrosMedico {
+  id_especialidad?: number;
+  id_sede?: number;
+}
+
+/**
+ * Parámetros de las consultas de disponibilidad, ya validados.
+ *
+ * Médico, especialidad y sede son obligatorios: sin los tres no se puede
+ * saber qué rangos de agenda mirar.
+ */
+export interface ConsultaDisponibilidad {
+  id_medico: number;
+  id_especialidad: number;
+  id_sede: number;
+}
+
+/**
+ * Turno con todos los datos que muestra el frontend, resueltos por JOIN.
+ *
+ * Reemplaza a la fila pelada de `turno` en los listados: el médico necesita
+ * nombre y fecha de nacimiento del paciente (para calcular la edad), el
+ * paciente necesita médico, especialidad y sede, y si el turno fue atendido,
+ * el resumen del historial clínico. Sin el JOIN, el frontend tendría que
+ * resolver cada id con una llamada aparte.
+ */
+export interface TurnoDetallado extends Turno {
+  id_medico: number;
+  id_especialidad: number;
+  id_sede: number;
+  medico: string;
+  especialidad: string;
+  sede: string;
+  paciente: string;
+  dni_paciente: string;
+  fecha_nacimiento_paciente: string;
+  cobertura: string;
+  diagnostico: string | null;
+  tratamiento: string | null;
+  observaciones: string | null;
+}
+
+/** Filtros opcionales extra de los listados diarios de turnos. */
+export interface FiltrosTurnosDia {
+  fecha: string;
+  id_sede?: number;
+  id_medico?: number;
+}
+
+/**
+ * Registro del historial con los datos del turno al que pertenece.
+ *
+ * Un diagnóstico suelto no dice nada si no se sabe de qué consulta salió:
+ * fecha, médico y especialidad del turno lo ponen en contexto.
+ */
+export interface HistorialDetallado extends HistorialClinico {
+  fecha_turno: string | null;
+  hora_turno: string | null;
+  medico: string;
+  especialidad: string;
+  sede: string;
+}
+
+/**
+ * Paciente tal como lo devuelve la búsqueda `GET /pacientes`.
+ *
+ * Trae la cobertura porque el operador la muestra en el resumen del turno
+ * que saca en nombre del paciente.
+ */
+export interface PacienteEncontrado {
+  id: number;
+  nombre: string;
+  apellido: string;
+  dni: string;
+  fecha_nacimiento: string;
+  id_cobertura: number | null;
+  cobertura: string | null;
+}
+
+/**
+ * Cuerpo ya validado de `PUT /pacientes/mis-datos`.
+ *
+ * Son los únicos cuatro campos que la consigna deja modificar al paciente. La
+ * contraseña es opcional: si no viene, se conserva la actual.
+ */
+export interface DatosMisDatos {
+  email: string;
+  telefono: string;
+  id_cobertura: number;
+  password?: string;
+}
+
+/**
+ * Cuerpo ya validado del alta o edición de un usuario por el administrador.
+ *
+ * - `password` es obligatoria en el alta y opcional en la edición.
+ * - `id_sede` va con valor solo para operador y médico (el admin opera sobre
+ *   todas las sedes y el paciente no pertenece a ninguna).
+ * - `id_cobertura` solo aplica al paciente.
+ * - `especialidades` solo aplica al médico (filas de `medico_especialidad`).
+ */
+export interface DatosUsuarioAdmin {
+  nombre: string;
+  apellido: string;
+  dni: string;
+  email: string;
+  telefono: string;
+  fecha_nacimiento: string;
+  rol: Rol;
+  password?: string;
+  id_sede: number | null;
+  id_cobertura: number | null;
+  especialidades: number[];
+}
+
+/** Usuario del listado del administrador, con nombres y especialidades. */
+export interface UsuarioListado extends UsuarioPublico {
+  sede: string | null;
+  cobertura: string | null;
+  especialidades: number[];
+}
+
+/** Filtros del listado de usuarios, ya validados. */
+export interface FiltrosUsuarios {
+  nombre?: string;
+  apellido?: string;
+  rol?: Rol;
+  id_sede?: number;
+}
+
+/** Página pedida de un listado paginado, ya validada. */
+export interface Paginacion {
+  /** Número de página, empezando en 1. */
+  pagina: number;
+  /** Cantidad de filas por página. */
+  limite: number;
+}
+
+/**
+ * Respuesta de un listado paginado.
+ *
+ * `total` es la cantidad de filas que cumplen los filtros en TODAS las
+ * páginas: el paginador del frontend lo necesita para saber cuántas páginas
+ * hay.
+ */
+export interface PaginaDe<T> extends Paginacion {
+  items: T[];
+  total: number;
 }

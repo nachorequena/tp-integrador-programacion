@@ -17,7 +17,7 @@
  * es de lo peor que le puede pasar a quien consume la API.
  */
 
-import { DatosNuevoTurno } from "../types";
+import { DatosNuevoTurno, FiltrosTurnosDia } from "../types";
 import {
   comoObjeto,
   esFechaValida,
@@ -25,6 +25,7 @@ import {
   lanzarSiHayErrores,
   textoLimpio,
   validarIdCuerpo,
+  validarIdOpcional,
 } from "./comunes";
 
 /**
@@ -126,4 +127,35 @@ export function validarFechaObligatoria(query: unknown): string {
   lanzarSiHayErrores(errores);
 
   return fecha;
+}
+
+/**
+ * Valida la query de los listados diarios de turnos: fecha obligatoria y,
+ * opcionalmente, sede y médico.
+ *
+ * - `GET /turnos/medico?fecha=&id_sede=` — el médico filtra por sede (la
+ *   pantalla "Turnos del día" muestra todas sus sedes por defecto).
+ * - `GET /turnos/sede?fecha=&id_medico=` — el operador filtra por médico (el
+ *   ícono de "ojo" de su agenda).
+ *
+ * Cada controller usa solo el filtro que le corresponde: un `id_sede` que le
+ * llegue al operador se ignora, porque su sede sale siempre del token.
+ *
+ * @param query `req.query` de Express.
+ * @returns Fecha y filtros opcionales ya validados.
+ * @throws `ErrorHttp` 400 si falta la fecha o algo vino mal formado.
+ */
+export function validarFiltrosTurnosDia(query: unknown): FiltrosTurnosDia {
+  const fecha = validarFechaObligatoria(query);
+  const datos = comoObjeto(query);
+  const errores: string[] = [];
+
+  const filtros: FiltrosTurnosDia = {
+    fecha,
+    id_sede: validarIdOpcional(datos.id_sede, "id_sede", errores),
+    id_medico: validarIdOpcional(datos.id_medico, "id_medico", errores),
+  };
+
+  lanzarSiHayErrores(errores);
+  return filtros;
 }
