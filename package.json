@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "test": "node --import tsx --import ./test/entorno-prueba.ts --test \"test/**/*.test.ts\"",
     "iniciar": "node scripts/iniciar.cjs",
     "base:reiniciar": "node scripts/iniciar.cjs --base-nueva --solo-base"
   },

@@ -334,10 +334,35 @@ La consigna final del frontend (`docs/Frontend-enunciado-completo.pdf`) sugiere 
 
 ### Middlewares
 
-- **`verificarToken`** — valida firma y vencimiento del JWT del header `Authorization: Bearer <token>`. Si falta, es inválido o expiró → **401**. Deja el payload en `req.usuario`.
+- **`verificarToken`** — valida firma y vencimiento del JWT del header `Authorization: Bearer <token>`, y además compara el token con el usuario **actual** de la base: si ya no existe o el admin le cambió el rol o la sede (por ejemplo, trasladó a un operador), la sesión vieja deja de servir. En todos esos casos → **401**. Deja el payload en `req.usuario`.
 - **`verificarRol(...roles)`** — valida que `req.usuario.rol` esté entre los permitidos → si no, **403**. Se monta siempre después de `verificarToken`.
 
 La pertenencia de cada fila de agenda **no** la resuelve `verificarRol` (un middleware de rol no sabe de quién es cada registro): eso se valida en `agenda.service.ts`.
+
+---
+
+## Consistencia ante acciones simultáneas
+
+Problemas que se detectaron probando acciones al mismo tiempo, y cómo se resolvieron:
+
+| Situación | Qué pasaba | Solución |
+| --- | --- | --- |
+| Dos pacientes confirman el mismo horario a la vez | Los dos recibían 201 y quedaban dos turnos confirmados | En `crearTurno`, la lectura de turnos ocupados usa `FOR UPDATE`. En REPEATABLE READ, un `SELECT` común lee la "foto" tomada al inicio de la transacción y no veía el turno recién confirmado por el otro. Ahora el segundo recibe **409** |
+| Atender y cancelar el mismo turno a la vez | Se aceptaban las dos: quedaba un turno con estado y historial contradictorios | El `UPDATE` exige `estado = 'confirmado'` y revisa `affectedRows`: solo una de las dos acciones gana, y la otra recibe **409** |
+| Dos `POST /historial` del mismo turno a la vez | Podían quedar dos historiales del mismo turno | Transacción con el turno bloqueado (`FOR UPDATE`) |
+| Cambiar la sede (o la fecha, el médico o la especialidad) de una agenda con turnos atendidos o cancelados | El historial pasaba a mostrar otra sede | **409**: un rango con turnos registrados conserva su contexto (los horarios sí se pueden cambiar) |
+| Operador trasladado de sede por el admin | Su token viejo seguía operando sobre la sede anterior | `verificarToken` compara el rol y la sede con la base → **401** y el frontend lo lleva al login |
+| Tabla `notificacion` llena (id `tinyint`, tope 127) | La API respondía 500, pero el turno sí se había guardado | Las notificaciones son un efecto secundario: si fallan, se registra en consola y la operación responde bien. Si cualquier tabla llega al tope, el manejador de errores lo explica en el mensaje en vez de dar un 500 genérico |
+
+> **Límite del esquema de la cátedra.** Todas las tablas usan ids `tinyint` (máximo 127 filas). No se modificó el esquema provisto. Para un uso real habría que ampliar las columnas a `INT`.
+
+## Pruebas automáticas
+
+```bash
+npm test
+```
+
+Usa el runner de Node (`node:test`) con `tsx`, sin dependencias extra ni base de datos (donde el código consulta MySQL, la prueba usa una versión falsa de `pool.query`). Cubre la grilla de turnos, el validador del alta de turno, `verificarToken` (incluido el traslado de sede) y el manejador de errores. Las pruebas están en `test/`. Los endpoints completos se prueban con la colección de Postman.
 
 ---
 

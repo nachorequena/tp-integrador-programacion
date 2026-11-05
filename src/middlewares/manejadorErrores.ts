@@ -87,6 +87,25 @@ export function manejadorErrores(
     return;
   }
 
+  // Caso 3.b: una tabla llegó al tope de su id. En el esquema de la cátedra
+  // todos los `id` son `tinyint` (máximo 127): al llegar ahí, el siguiente
+  // INSERT choca contra la clave primaria ("Duplicate entry '127' for key
+  // 'turno.PRIMARY'"). Ningún INSERT del sistema elige el id a mano, así que
+  // un duplicado en PRIMARY solo puede significar eso. Se responde un 500 con
+  // un mensaje que dice qué pasó, en vez del genérico.
+  const mensajeMysql = String((error as { sqlMessage?: unknown } | null)?.sqlMessage ?? "");
+  const tablaLlena = /for key '(\w+)\.PRIMARY'/.exec(mensajeMysql);
+  if (codigoMysql === "ER_DUP_ENTRY" && tablaLlena) {
+    console.error("[tabla llena]", mensajeMysql);
+    responder(
+      res,
+      500,
+      `La tabla "${tablaLlena[1]}" alcanzó la cantidad máxima de registros que admite su id (tinyint, 127): la operación no se completó.`,
+      null,
+    );
+    return;
+  }
+
   // Caso 4: inesperado. Al log completo, al cliente solo lo genérico.
   console.error("[error inesperado]", error);
   responder(res, 500, "Error interno del servidor", null);
