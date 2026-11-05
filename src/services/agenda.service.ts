@@ -295,7 +295,8 @@ async function horasConfirmadas(idAgenda: number): Promise<string[]> {
  * dejando algún turno confirmado fuera del nuevo horario". Además, si el rango
  * tiene turnos confirmados, tampoco se le puede cambiar la fecha, el médico,
  * la especialidad ni la sede: el turno quedaría apuntando a un rango que ya no
- * es el que el paciente reservó.
+ * es el que el paciente reservó. Lo mismo si tiene turnos atendidos o
+ * cancelados, para no alterar el historial (ver el comentario de adentro).
  *
  * Un turno queda "adentro" si empieza a la hora de entrada o después y termina
  * (inicio + 30 minutos) antes o justo a la hora de salida.
@@ -305,14 +306,34 @@ async function horasConfirmadas(idAgenda: number): Promise<string[]> {
  * @throws `ErrorHttp` 409 con un mensaje que explica qué turnos lo impiden.
  */
 async function validarTurnosConfirmados(existente: Agenda, datos: DatosAgenda): Promise<void> {
-  const horas = await horasConfirmadas(existente.id);
-  if (horas.length === 0) return;
-
+  // ¿Cambia algo de lo que "cuenta" dónde y con quién fue el turno?
   const cambiaContexto =
     existente.fecha !== datos.fecha ||
     existente.id_medico !== datos.id_medico ||
     existente.id_especialidad !== datos.id_especialidad ||
     existente.id_sede !== datos.id_sede;
+
+  // HISTORIAL: los turnos atendidos o cancelados no guardan sede, médico ni
+  // especialidad propios: los toman del rango de agenda (`turno.id_agenda`).
+  // Si se le cambiara la sede al rango, un turno atendido el mes pasado en
+  // "Sede Centro" pasaría a mostrarse en "Sede Norte" en "Mis turnos", en el
+  // historial clínico y en los reportes. Por eso, si el rango ya tiene
+  // cualquier turno, su contexto queda fijo (los horarios sí pueden cambiar).
+  if (cambiaContexto) {
+    const [historicos] = await pool.query<RowDataPacket[]>(
+      "SELECT COUNT(*) AS cantidad FROM turno WHERE id_agenda = ? AND estado <> 'confirmado'",
+      [existente.id],
+    );
+    if (Number(historicos[0].cantidad) > 0) {
+      throw new ErrorHttp(
+        409,
+        "El rango tiene turnos atendidos o cancelados que forman parte del historial: no se puede cambiar su fecha, médico, especialidad ni sede. Creá un rango nuevo.",
+      );
+    }
+  }
+
+  const horas = await horasConfirmadas(existente.id);
+  if (horas.length === 0) return;
 
   if (cambiaContexto) {
     throw new ErrorHttp(

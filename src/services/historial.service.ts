@@ -64,84 +64,108 @@ export async function registrarHistorial(
     );
   }
 
-  const [filas] = await pool.query<RowDataPacket[]>(
-    `SELECT
-       t.id,
-       t.id_paciente,
-       t.estado,
-       a.id_medico,
-       a.id_sede
-     FROM turno t
-     INNER JOIN agenda a
-       ON a.id = t.id_agenda
-     WHERE t.id = ?
-     LIMIT 1`,
-    [idTurno],
-  );
+  // Transacción con el turno BLOQUEADO (`FOR UPDATE`). Sin el bloqueo, dos
+  // pedidos simultáneos para el mismo turno (doble clic, dos pestañas) leerían
+  // los dos "no tiene historial" y guardarían DOS historiales. Con el bloqueo,
+  // el segundo espera a que el primero termine y después ve el historial ya
+  // cargado → 409.
+  const conexion = await pool.getConnection();
+  try {
+    await conexion.beginTransaction();
 
-  if (filas.length === 0) {
-    throw new ErrorHttp(
-      404,
-      "Turno no encontrado",
-    );
-  }
-
-  const turno = filas[0];
-
-  if (turno.estado !== "atendido") {
-    throw new ErrorHttp(
-      400,
-      "El historial solo puede registrarse en un turno atendido",
-    );
-  }
-
-  if (Number(turno.id_medico) !== idMedico) {
-    throw new ErrorHttp(
-      403,
-      "El médico solo puede registrar historial de sus propios turnos",
-    );
-  }
-
-
-  const [historialExistente] =
-    await pool.query<RowDataPacket[]>(
-      `SELECT id
-       FROM historial_clinico
-       WHERE id_turno = ?
-       LIMIT 1`,
+    const [filas] = await conexion.query<RowDataPacket[]>(
+      `SELECT
+         t.id,
+         t.id_paciente,
+         t.estado,
+         a.id_medico,
+         a.id_sede
+       FROM turno t
+       INNER JOIN agenda a
+         ON a.id = t.id_agenda
+       WHERE t.id = ?
+       LIMIT 1
+         FOR UPDATE`,
       [idTurno],
     );
 
-  if (historialExistente.length > 0) {
-    throw new ErrorHttp(
-      409,
-      "El turno ya tiene un historial clínico registrado",
-    );
+    // El turno no existe → 404.
+    if (filas.length === 0) {
+      throw new ErrorHttp(
+        404,
+        "Turno no encontrado",
+      );
+    }
+
+    const turno = filas[0];
+
+    // Solo se carga historial de un turno atendido → 400.
+    if (turno.estado !== "atendido") {
+      throw new ErrorHttp(
+        400,
+        "El historial solo puede registrarse en un turno atendido",
+      );
+    }
+
+    // Solo el médico que lo atendió → 403.
+    if (Number(turno.id_medico) !== idMedico) {
+      throw new ErrorHttp(
+        403,
+        "El médico solo puede registrar historial de sus propios turnos",
+      );
+    }
+
+    // Ya tiene historial → 409. También con `FOR UPDATE`, para leer lo último
+    // guardado y no la "foto" del inicio de la transacción.
+    const [historialExistente] =
+      await conexion.query<RowDataPacket[]>(
+        `SELECT id
+         FROM historial_clinico
+         WHERE id_turno = ?
+         LIMIT 1
+           FOR UPDATE`,
+        [idTurno],
+      );
+
+    if (historialExistente.length > 0) {
+      throw new ErrorHttp(
+        409,
+        "El turno ya tiene un historial clínico registrado",
+      );
+    }
+
+    const [resultado] =
+      await conexion.query<ResultSetHeader>(
+        `INSERT INTO historial_clinico
+          (
+            id_turno,
+            id_medico,
+            id_paciente,
+            diagnostico,
+            tratamiento,
+            observaciones
+          )
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          idTurno,
+          idMedico,
+          turno.id_paciente,
+          datos.diagnostico,
+          datos.tratamiento || null,
+          datos.observaciones || null,
+        ],
+      );
+
+    await conexion.commit();
+    return resultado.insertId;
+  } catch (error) {
+    // Cualquier error deshace todo y se relanza para el controller.
+    await conexion.rollback();
+    throw error;
+  } finally {
+    // La conexión vuelve al pool siempre.
+    conexion.release();
   }
-
-  const [resultado] =
-    await pool.query<ResultSetHeader>(
-      `INSERT INTO historial_clinico
-        (
-          id_turno,
-          id_medico,
-          id_paciente,
-          diagnostico,
-          tratamiento,
-          observaciones
-        )
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        idTurno,
-        idMedico,
-        turno.id_paciente,
-        datos.diagnostico,
-        datos.tratamiento || null,
-        datos.observaciones || null,
-      ],
-    );
-
-  return resultado.insertId;
 }
 
 /**

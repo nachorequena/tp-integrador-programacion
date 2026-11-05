@@ -19,10 +19,18 @@
  *
  * "Bearer" ("portador") es el esquema estándar para tokens: significa que quien
  * lo presenta tiene el permiso, sin más pruebas.
+ *
+ * Además de la firma, se controla contra la BASE que el usuario siga
+ * existiendo y que su rol y su sede sigan siendo los del token. El token se
+ * firma al hacer login y dura un día: sin este control, si el admin traslada a
+ * un operador a otra sede, el token viejo le seguiría permitiendo operar sobre
+ * la sede anterior hasta que venza.
  */
 
 import { NextFunction, Request, Response } from "express";
 import { TokenExpiredError } from "jsonwebtoken";
+import { RowDataPacket } from "mysql2";
+import { pool } from "../database/conexion";
 import { ErrorHttp } from "../utils/errorHttp";
 import { verificarFirmaToken } from "../utils/jwt";
 
@@ -41,11 +49,11 @@ import { verificarFirmaToken } from "../utils/jwt";
  * @param _res Sin uso.
  * @param next Continuación de la cadena de Express.
  */
-export function verificarToken(
+export async function verificarToken(
   req: Request,
   _res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   const header = req.headers.authorization;
 
   // Caso 1: no mandaron el header.
@@ -68,19 +76,56 @@ export function verificarToken(
     return;
   }
 
+  // Caso 3: se verifica la firma. Si falla, se distinguen los dos motivos
+  // porque para el usuario no es lo mismo: si venció, alcanza con volver a
+  // loguearse.
+  let payload;
   try {
-    // Caso 3: el token es válido. Se guarda el payload en la petición para que
-    // el controller sepa quién la hizo sin volver a decodificar nada.
-    req.usuario = verificarFirmaToken(token);
-    next();
+    payload = verificarFirmaToken(token);
   } catch (error) {
-    // Caso 4: la verificación falló. Se distinguen los dos motivos porque para
-    // el usuario no es lo mismo: si venció, alcanza con volver a loguearse.
     if (error instanceof TokenExpiredError) {
       next(new ErrorHttp(401, "El token expiró"));
       return;
     }
     // Firma que no coincide, token manipulado o texto que ni siquiera es un JWT.
     next(new ErrorHttp(401, "Token inválido"));
+    return;
+  }
+
+  try {
+    // Caso 4: la firma es válida, pero los datos pueden haber cambiado desde
+    // el login. Se lee el usuario ACTUAL de la base (una consulta por id, por
+    // clave primaria: es instantánea).
+    const [filas] = await pool.query<RowDataPacket[]>(
+      "SELECT rol, id_sede FROM usuario WHERE id = ?",
+      [payload.id],
+    );
+    // 4.a: el usuario ya no existe → 401.
+    if (filas.length === 0) {
+      next(new ErrorHttp(401, "El usuario de esta sesión ya no existe"));
+      return;
+    }
+    // 4.b: el admin le cambió el rol o la sede → 401, para que vuelva a
+    // iniciar sesión y reciba un token con los datos nuevos. (El frontend, al
+    // recibir un 401, cierra la sesión y lleva al login.)
+    const idSedeActual = filas[0].id_sede === null ? null : Number(filas[0].id_sede);
+    if (filas[0].rol !== payload.rol || idSedeActual !== payload.id_sede) {
+      next(
+        new ErrorHttp(
+          401,
+          "Tus datos de acceso cambiaron (rol o sede). Volvé a iniciar sesión.",
+        ),
+      );
+      return;
+    }
+
+    // Caso 5: todo en orden. Se guarda el payload en la petición para que el
+    // controller sepa quién la hizo sin volver a decodificar nada.
+    req.usuario = payload;
+    next();
+  } catch (error) {
+    // Error de la base (por ejemplo, MySQL apagado): lo resuelve el manejador
+    // de errores con un 500.
+    next(error);
   }
 }

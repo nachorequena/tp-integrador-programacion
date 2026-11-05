@@ -78,6 +78,14 @@ const SELECT_TURNO_DETALLE = `
     JOIN cobertura c ON c.id = t.id_cobertura
     LEFT JOIN historial_clinico h ON h.id_turno = t.id`;
 
+/**
+ * Mensaje del 409 cuando otra persona canceló o atendió el turno justo antes
+ * (por ejemplo, el paciente cancela en el mismo momento en que el médico lo
+ * atiende). Lo usan `cancelarTurno` y `atenderTurno`.
+ */
+const TURNO_YA_MODIFICADO =
+  "El turno ya no está confirmado: otro usuario lo canceló o lo atendió recién. Actualizá la pantalla.";
+
 /** Los tres eventos de un turno que generan notificaciones. */
 type EventoTurno = "confirmado" | "cancelado" | "atendido";
 
@@ -149,11 +157,45 @@ export async function buscarTurnoDetallado(idTurno: number): Promise<TurnoDetall
  * Las fechas van en formato día/mes/año porque el texto llega armado a la
  * pantalla, y la consigna pide fechas en formato local.
  *
+ * **Nunca lanza.** Se llama DESPUÉS de que el turno ya quedó guardado
+ * (confirmado, cancelado o atendido). Si una notificación fallara y el error
+ * se propagara, el cliente recibiría un 500 aunque la operación sí se hizo: el
+ * paciente vería "error" con un turno ya reservado. Pasa de verdad: el id de
+ * `notificacion` es `tinyint` (tope 127) en el esquema de la cátedra, y al
+ * llegar al tope todo INSERT falla. Por eso el fallo se absorbe y se avisa
+ * por consola, igual que en `auditoria.service.ts → registrarLog`.
+ *
  * @param turno Turno ya detallado (con nombres).
  * @param evento Qué le pasó al turno.
  * @param actor Quién hizo la acción (payload del token).
  */
 async function notificarEvento(
+  turno: TurnoDetallado,
+  evento: EventoTurno,
+  actor: PayloadJWT,
+): Promise<void> {
+  try {
+    await crearNotificacionesDelEvento(turno, evento, actor);
+  } catch (error) {
+    // La operación del turno ya está hecha: se registra el problema y se sigue.
+    console.error(
+      `[notificaciones] no se pudieron crear las notificaciones de "turno_${evento}" ` +
+        `(turno ${turno.id}). El turno sí se guardó. Si el motivo es que la tabla ` +
+        "se llenó (notificacion.id es tinyint, tope 127), hay que vaciarla o ampliar la columna.",
+      error,
+    );
+  }
+}
+
+/**
+ * Inserta las notificaciones de un evento (paciente, médico y, si actuó un
+ * operador, el operador). Puede lanzar: la protege `notificarEvento`.
+ *
+ * @param turno Turno ya detallado (con nombres).
+ * @param evento Qué le pasó al turno.
+ * @param actor Quién hizo la acción (payload del token).
+ */
+async function crearNotificacionesDelEvento(
   turno: TurnoDetallado,
   evento: EventoTurno,
   actor: PayloadJWT,
@@ -283,8 +325,21 @@ export async function crearTurno(
     // VALIDACIÓN 4 — el horario sigue libre. Trae las horas de los turnos
     // CONFIRMADOS de ese rango (los cancelados liberan el lugar, por eso no
     // cuentan; los atendidos son del pasado).
+    //
+    // ⚠️ El `FOR UPDATE` de esta consulta es IMPRESCINDIBLE. MySQL (InnoDB, en
+    // REPEATABLE READ) toma una "foto" de la base en el primer SELECT común de
+    // la transacción (acá, el de la cobertura) y los SELECT comunes siguientes
+    // leen esa foto vieja. Si dos pacientes piden el mismo horario a la vez:
+    //   1) los dos sacan la foto (todavía sin turnos);
+    //   2) el primero bloquea la agenda, inserta y hace COMMIT;
+    //   3) el segundo, que esperaba el bloqueo, leería la foto vieja, no vería
+    //      el turno recién creado e insertaría un DUPLICADO.
+    // Una lectura con `FOR UPDATE` no usa la foto: lee lo último confirmado
+    // (y además bloquea esas filas), así el segundo ve el turno y recibe 409.
     const [confirmados] = await conexion.query<RowDataPacket[]>(
-      "SELECT hora FROM turno WHERE id_agenda = ? AND estado = 'confirmado' AND hora IS NOT NULL",
+      `SELECT hora FROM turno
+        WHERE id_agenda = ? AND estado = 'confirmado' AND hora IS NOT NULL
+          FOR UPDATE`,
       [agenda.id],
     );
     // Pasa "HH:MM" a minutos desde medianoche ("09:30" → 570) para poder restar.
@@ -373,6 +428,7 @@ function validarPermisoSobreTurno(turno: TurnoDetallado, usuario: PayloadJWT): v
  * @throws `ErrorHttp` 404 si el turno no existe.
  * @throws `ErrorHttp` 403 si no le corresponde a quien cancela.
  * @throws `ErrorHttp` 400 si el turno no está confirmado.
+ * @throws `ErrorHttp` 409 si otro usuario lo canceló o atendió en el mismo momento.
  */
 export async function cancelarTurno(
   idTurno: number,
@@ -381,11 +437,25 @@ export async function cancelarTurno(
   const turno = await buscarTurnoDetallado(idTurno);
   validarPermisoSobreTurno(turno, usuario);
 
+  // Chequeo rápido para dar un mensaje claro en el caso normal (el turno ya
+  // estaba cancelado o atendido de antes).
   if (turno.estado !== "confirmado") {
     throw new ErrorHttp(400, "Solo se pueden cancelar turnos confirmados");
   }
 
-  await pool.query("UPDATE turno SET estado = 'cancelado' WHERE id = ?", [idTurno]);
+  // El chequeo de arriba NO alcanza si dos personas actúan a la vez (por
+  // ejemplo, el paciente cancela mientras el médico lo atiende): las dos
+  // leerían "confirmado". Por eso la condición se repite DENTRO del UPDATE
+  // (`AND estado = 'confirmado'`): MySQL la evalúa sobre el valor actual de la
+  // fila, con la fila bloqueada, así que solo una de las dos acciones puede
+  // cambiar el estado. Si `affectedRows` es 0, otro llegó primero → 409.
+  const [resultado] = await pool.query<ResultSetHeader>(
+    "UPDATE turno SET estado = 'cancelado' WHERE id = ? AND estado = 'confirmado'",
+    [idTurno],
+  );
+  if (resultado.affectedRows === 0) {
+    throw new ErrorHttp(409, TURNO_YA_MODIFICADO);
+  }
 
   const cancelado = await buscarTurnoDetallado(idTurno);
   await notificarEvento(cancelado, "cancelado", usuario);
@@ -409,6 +479,7 @@ export async function cancelarTurno(
  * @throws `ErrorHttp` 404 si el turno no existe.
  * @throws `ErrorHttp` 403 si el turno es de otro médico.
  * @throws `ErrorHttp` 400 si el turno no está confirmado.
+ * @throws `ErrorHttp` 409 si otro usuario lo canceló o atendió en el mismo momento.
  */
 export async function atenderTurno(
   idTurno: number,
@@ -426,7 +497,17 @@ export async function atenderTurno(
   try {
     await conexion.beginTransaction();
 
-    await conexion.query("UPDATE turno SET estado = 'atendido' WHERE id = ?", [idTurno]);
+    // Igual que en `cancelarTurno`: la condición `estado = 'confirmado'` va
+    // dentro del UPDATE para que, si el turno se canceló mientras tanto, no se
+    // marque como atendido ni se le guarde un historial. affectedRows 0 → 409,
+    // y el `catch` hace ROLLBACK.
+    const [resultado] = await conexion.query<ResultSetHeader>(
+      "UPDATE turno SET estado = 'atendido' WHERE id = ? AND estado = 'confirmado'",
+      [idTurno],
+    );
+    if (resultado.affectedRows === 0) {
+      throw new ErrorHttp(409, TURNO_YA_MODIFICADO);
+    }
 
     if (historial) {
       // El paciente sale del turno, nunca del cuerpo: así no se puede cargar
